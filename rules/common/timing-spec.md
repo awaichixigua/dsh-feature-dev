@@ -18,7 +18,6 @@
 | `kb-update` | 300 | 12k | 8 |
 | `bugfix-locate` | 300 | 12k | 8 |
 | `bugfix-fix` | 900 | 32k | 20 |
-| `code-question` | 120 | 8k | 6 |
 | `influence-menu` | 300 | 16k | 10 |
 
 如果某个阶段超过预算，Workflow Core 会把该阶段标记为 `warn` 并继续执行。

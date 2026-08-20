@@ -2,7 +2,7 @@
  * Contract tests: skills and tools.
  *
  * These tests enforce the public contract that DSH depends on:
- *   - exactly 9 skills are registered, with the right names
+ *   - exactly 8 skills are registered, with the right names
  *   - each skill is invocable and has a non-empty description
  *   - the 4 feature_dev_* tools have stable schemas
  *   - no skill body contains Claude placeholders
@@ -18,17 +18,15 @@ import { existsSync } from 'node:fs';
 const here = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(here, '..', '..');
 
-void test('9 skills are discoverable from the package root', () => {
+void test('8 skills are discoverable from the package root', () => {
   const skills = discoverSkills(PKG_ROOT);
   const names = skills.map((s) => s.name).sort();
   assert.deepEqual(names, [
     'archive',
     'bugfix',
     'code-gen-tdd',
-    'code-question',
     'implementation-plan',
     'influence-menu',
-    'init',
     'knowledge-base',
     'mrd-to-code',
     'prd-clarify',

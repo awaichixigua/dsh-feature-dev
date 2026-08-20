@@ -24,8 +24,6 @@ const PKG_ROOT = resolve(here, '..', '..', '..');
 function makeProject(): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-fd-int-'));
   mkdirSync(join(dir, '.git'), { recursive: true });
-  mkdirSync(join(dir, 'app-knowledge-base'), { recursive: true });
-  writeFileSync(join(dir, 'app-knowledge-base', 'KB_FRESHNESS.md'), '# KB Freshness\nlast_updated: 2026-08-20\n');
   // Tech design
   const fd = join(dir, 'req', 'create-order');
   mkdirSync(join(fd, 'ai'), { recursive: true });
@@ -89,26 +87,6 @@ void test('end-to-end implementation-plan: produces mrd-original and confirms pr
     assert.equal(run.ok, true, JSON.stringify(run, null, 2));
     if (!run.ok) return;
     assert.ok(['paused', 'blocked', 'running'].includes(run.data.status), run.data.status);
-  } finally {
-    rmSync(project, { recursive: true, force: true });
-  }
-});
-
-void test('one-shot workflow (init): completes in a single phase', async () => {
-  const project = makeProject();
-  try {
-    const run = await runFeatureDev(
-      { packageRoot: PKG_ROOT, importMetaUrl: import.meta.url },
-      {
-        workflow: 'init',
-        projectRoot: project,
-        options: { resume: false, unitTests: true, generateUnitTestsOnly: false },
-      }
-    );
-    assert.equal(run.ok, true, JSON.stringify(run, null, 2));
-    if (!run.ok) return;
-    // init is a placeholder; the workflow's one-shot drives to COMPLETED.
-    assert.ok(['completed', 'running', 'paused'].includes(run.data.status), run.data.status);
   } finally {
     rmSync(project, { recursive: true, force: true });
   }

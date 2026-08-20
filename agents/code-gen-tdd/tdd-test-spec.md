@@ -38,3 +38,7 @@ code-gen-tdd 的第 1 阶段。吃 `<featureDir>/tech-design.md`，产出 `<feat
 - 用 `kbContextPath` 按需读 L0 的 CONTEXT.md；不要把整个 KB 内联进来。
 - `pass` 至少要 1 条 evidence。
 - `block` 时 `blocker` 必须写明解锁条件。
+
+## 项目级通用工具约束
+
+若 `<projectRoot>/arch-docs/project-tools-index.md` 存在，先读取索引。需求、技术方案或测试规格命中索引中的工具时，必须读取索引指定的 `arch-docs/project-tools/*.md` 详情，并把硬约束落实到测试入口、验收点和禁止项。索引不存在时静默跳过；命中工具的详情文件缺失或无法读取时，返回 `block` 并说明路径和解锁条件。

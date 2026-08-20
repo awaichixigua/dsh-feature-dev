@@ -60,9 +60,7 @@ export async function runWorkflow(
       return bugfix(state, inv, deps);
     case 'archive':
       return archive(state, inv, deps);
-    case 'init':
     case 'knowledge-base':
-    case 'code-question':
     case 'prd-clarify':
     case 'influence-menu':
       return oneShot(state, inv, deps);

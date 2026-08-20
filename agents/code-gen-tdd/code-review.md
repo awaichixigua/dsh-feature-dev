@@ -35,3 +35,7 @@ output: code-review.md
 - `pass` 必须至少 1 条 evidence。
 - `block` 必须在 `blocker` 写清解锁条件（例如 "修复 OrderService.charge:42 的空值安全问题"）。
 - 审查范围仅限 `git diff` 的 "+" 行；不重审未改动的代码。
+
+## 项目级通用工具约束
+
+若 `<projectRoot>/arch-docs/project-tools-index.md` 存在，先读取索引。生产代码 diff、技术方案、测试规格或任务内容命中索引中的工具时，必须读取索引指定的 `arch-docs/project-tools/*.md` 详情，并将硬约束纳入 Review 检查。索引不存在时静默跳过；命中工具的详情文件缺失或无法读取时，返回 `block`，不得给出通过或警告结论。

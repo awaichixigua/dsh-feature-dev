@@ -28,3 +28,7 @@ output: test files
   "changedFiles": ["src/test/java/.../OrderServiceTest.java"]
 }
 ```
+
+## 项目级通用工具约束
+
+若 `<projectRoot>/arch-docs/project-tools-index.md` 存在，先读取索引。测试目标、测试规格、实现代码入口或待测试代码命中索引中的工具时，必须读取索引指定的 `arch-docs/project-tools/*.md` 详情，并遵守其中对测试入口、Mock 边界和禁止项的要求。索引不存在时静默跳过；命中工具的详情文件缺失或无法读取时，返回 `block` 并说明路径和解锁条件。

@@ -45,9 +45,9 @@ void test('create() twice throws conflict', () => {
   const dir = makeTmp();
   try {
     const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
-    repo.create({ workflow: 'init', projectRoot: dir, featureDir: dir });
+    repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
     assert.throws(
-      () => repo.create({ workflow: 'init', projectRoot: dir, featureDir: dir }),
+      () => repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir }),
       /already exists/
     );
   } finally {
@@ -209,7 +209,7 @@ void test('schemaVersion mismatch throws', () => {
   const dir = makeTmp();
   try {
     const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
-    repo.create({ workflow: 'init', projectRoot: dir, featureDir: dir });
+    repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
     const txt = readFileSync(repo.statePath, 'utf8');
     const bad = txt.replace('"1.0.0"', '"0.9.0"');
     writeFileSync(repo.statePath, bad, 'utf8');
@@ -223,7 +223,7 @@ void test('state.json is written atomically (no .tmp leftovers)', () => {
   const dir = makeTmp();
   try {
     const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
-    repo.create({ workflow: 'init', projectRoot: dir, featureDir: dir });
+    repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
     const entries = readdirSync(repo.aiDir);
     const stray = entries.filter((n: string) => n.includes('.tmp-'));
     assert.equal(stray.length, 0);
@@ -236,7 +236,7 @@ void test('state.json size and mtime are reasonable', () => {
   const dir = makeTmp();
   try {
     const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
-    repo.create({ workflow: 'init', projectRoot: dir, featureDir: dir });
+    repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
     const st = statSync(repo.statePath);
     assert.ok(st.size > 50);
   } finally {

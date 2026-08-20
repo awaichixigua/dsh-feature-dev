@@ -70,13 +70,11 @@ D:\ai\dsh-feature-dev
 
 ```text
 /mrd-to-code
-/init
 /knowledge-base
 /implementation-plan
 /code-gen-tdd
 /bugfix
 /archive
-/code-question
 /prd-clarify
 /influence-menu
 ```
@@ -117,13 +115,11 @@ D:\ai\dsh-feature-dev
 
 | 原 Claude 命令 | 新项目调用 |
 |---|---|
-| `/feature-dev:00-init` | `/init` |
 | `/feature-dev:01-knowledge-base` | `/knowledge-base` |
 | `/feature-dev:02-implementation-plan` | `/implementation-plan` |
 | `/feature-dev:03-code-gen-tdd` | `/code-gen-tdd` |
 | `/feature-dev:04-archive` | `/archive` |
 | `/feature-dev:bugfix` | `/bugfix` |
-| `/feature-dev:code-question` | `/code-question` |
 | `/feature-dev:prd-clarify` | `/prd-clarify` |
 | `/feature-dev:influence-menu` | `/influence-menu` |
 | `/feature-dev:fix-beads-duplicates` | 首期不提供；后续以需要确认的维护工具实现 |
@@ -210,13 +206,11 @@ D:\ai\dsh-feature-dev\
 │     └─ archive.ts
 ├─ skills/
 │  ├─ mrd-to-code/SKILL.md
-│  ├─ init/SKILL.md
 │  ├─ knowledge-base/SKILL.md
 │  ├─ implementation-plan/SKILL.md
 │  ├─ code-gen-tdd/SKILL.md
 │  ├─ bugfix/SKILL.md
 │  ├─ archive/SKILL.md
-│  ├─ code-question/SKILL.md
 │  ├─ prd-clarify/SKILL.md
 │  └─ influence-menu/SKILL.md
 ├─ agents/
@@ -366,13 +360,11 @@ Skill 不负责：
 ```ts
 interface FeatureDevInvocation {
   workflow:
-    | 'init'
     | 'knowledge-base'
     | 'implementation-plan'
     | 'code-gen-tdd'
     | 'bugfix'
     | 'archive'
-    | 'code-question'
     | 'prd-clarify'
     | 'influence-menu'
   projectRoot: string
@@ -720,7 +712,7 @@ dsh --profile headless --dump-config
 | DSH-003 | 实现 Bundle Manifest 和 Cordis Patch | P0 |
 | DSH-004 | 实现 Package Root 与 Project Root Resolver | P0 |
 | DSH-005 | 实现 Skill Provider | P0 |
-| DSH-006 | 迁移并改造 `mrd-to-code/init/knowledge-base` Skills | P0 |
+| DSH-006 | 迁移并改造 `mrd-to-code/knowledge-base` Skills | P0 |
 | DSH-007 | 迁移并改造 `implementation-plan/code-gen-tdd` Skills | P0 |
 | DSH-008 | 定义 Invocation 和 PhaseResult Schema | P0 |
 | DSH-009 | 实现 State Repository 和 State Machine | P0 |

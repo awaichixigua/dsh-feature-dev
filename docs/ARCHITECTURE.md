@@ -95,9 +95,7 @@ TEST_SPEC → 确认 → IMPLEMENTATION → REVIEW
 
 | 工作流 | 类型 | 主要 agent / 结果 |
 | --- | --- | --- |
-| `init` | one-shot | `init`；可选地创建知识库时效标记。 |
 | `knowledge-base` | one-shot | `kb-update`；建立或更新知识库。 |
-| `code-question` | one-shot | `code-question`；只读回答代码与业务问题。 |
 | `prd-clarify` | one-shot | `mrd-clarify`；仅做需求澄清。 |
 | `influence-menu` | one-shot | `influence-menu`；输出只读影响面分析。 |
 | `bugfix` | 分支工作流 | `bugfix-locate` 后按分类进入文档修订或代码修复，再验证和报告。 |

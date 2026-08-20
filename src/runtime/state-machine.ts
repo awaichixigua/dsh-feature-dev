@@ -101,9 +101,7 @@ const EDGES: Record<WorkflowId, EdgeMap> = {
   bugfix: BUGFIX_EDGES,
   archive: ARCHIVE_EDGES,
   'mrd-to-code': IMPLEMENTATION_PLAN_EDGES, // alias for the orchestrator entry
-  init: { INITIALIZED: new Set(['COMPLETED']), COMPLETED: new Set() },
   'knowledge-base': { INITIALIZED: new Set(['COMPLETED']), COMPLETED: new Set() },
-  'code-question': { INITIALIZED: new Set(['COMPLETED']), COMPLETED: new Set() },
   'prd-clarify': { INITIALIZED: new Set(['COMPLETED']), COMPLETED: new Set() },
   'influence-menu': { INITIALIZED: new Set(['COMPLETED']), COMPLETED: new Set() },
 };

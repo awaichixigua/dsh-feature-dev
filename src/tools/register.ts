@@ -42,21 +42,19 @@ const PROJECT_ROOT = {
 
 const FEATURE_DIR = {
   type: 'string' as const,
-  description: '需求目录路径（绝对路径或相对 projectRoot）。示例：`req/create-order`。单次工作流 init、knowledge-base、code-question、prd-clarify、influence-menu 可省略；code-gen-tdd、implementation-plan、mrd-to-code、bugfix、archive 必填。',
+  description: '需求目录路径（绝对路径或相对 projectRoot）。示例：`req/create-order`。单次工作流 knowledge-base、prd-clarify、influence-menu 可省略；code-gen-tdd、implementation-plan、mrd-to-code、bugfix、archive 必填。',
 } as const;
 
 const WORKFLOW = {
   type: 'string' as const,
-  description: '要执行的工作流：code-gen-tdd、implementation-plan、bugfix、archive、init、knowledge-base、code-question、prd-clarify、influence-menu、mrd-to-code 之一。',
+  description: '要执行的工作流：code-gen-tdd、implementation-plan、bugfix、archive、knowledge-base、prd-clarify、influence-menu、mrd-to-code 之一。',
   enum: [
     'mrd-to-code',
-    'init',
     'knowledge-base',
     'implementation-plan',
     'code-gen-tdd',
     'bugfix',
     'archive',
-    'code-question',
     'prd-clarify',
     'influence-menu',
   ] as const,

@@ -116,7 +116,7 @@ void test('buildSkillProviderFactory: produces a provider with async list + get'
   const provider = factory({} as never);
   // async list
   const list = await provider.list({} as never);
-  assert.ok(list.length >= 9, `expected >= 9 skills; got ${list.length}`);
+  assert.ok(list.length >= 8, `expected >= 8 skills; got ${list.length}`);
   for (const s of list) {
     assert.equal(s.invocation.userInvocable, true, `${s.name} should be user-invocable`);
   }
@@ -127,10 +127,10 @@ void test('buildSkillProviderFactory: produces a provider with async list + get'
   assert.ok(def!.content.length > 0, 'SkillDefinition.content should be non-empty');
 });
 
-void test('discoverSkills: lists >= 9 skills from this package', () => {
+void test('discoverSkills: lists >= 8 skills from this package', () => {
   const packageRoot = resolve(import.meta.dirname, '..', '..');
   const skills = discoverSkills(packageRoot);
-  assert.ok(skills.length >= 9, `expected >= 9 skills; got ${skills.length}`);
+  assert.ok(skills.length >= 8, `expected >= 8 skills; got ${skills.length}`);
 });
 
 void test('SDK defineTool: wraps spec into a ToolDefinition with parameters + output.render', async () => {

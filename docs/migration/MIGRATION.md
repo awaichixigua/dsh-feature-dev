@@ -29,13 +29,11 @@ The original project is read-only and not modified by this bundle.
 | Original | New | Notes |
 |---|---|---|
 | `SKILL.md` (orchestrator) | `skills/mrd-to-code/SKILL.md` | Rewritten with DSH semantics |
-| `skills/00-init/SKILL.md` | `skills/init/SKILL.md` | Path-resolver rules rewritten |
 | `skills/01-knowledge-base/SKILL.md` | `skills/knowledge-base/SKILL.md` | L0/L1/L2 rules moved to `rules/common/agents.md` |
 | `skills/02-implementation-plan/SKILL.md` | `skills/implementation-plan/SKILL.md` | MODE A/B both retained |
 | `skills/03-code-gen-tdd/SKILL.md` | `skills/code-gen-tdd/SKILL.md` | State machine matches `src/runtime/state-machine.ts` |
 | `skills/04-archive/SKILL.md` | `skills/archive/SKILL.md` | 4-step flow |
 | `skills/bugfix/SKILL.md` | `skills/bugfix/SKILL.md` | 6-step flow |
-| `skills/code-question/SKILL.md` | `skills/code-question/SKILL.md` | One-shot |
 | `skills/influence-menu/SKILL.md` | `skills/influence-menu/SKILL.md` | One-shot |
 | `skills/prd-clarify/SKILL.md` | `skills/prd-clarify/SKILL.md` | One-shot |
 | `agents/<name>/<name>-agent.md` (21 agents) | `agents/<name>.md` (16 agents) | Migrated with PhaseRequest/PhaseResult contract |

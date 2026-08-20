@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { normalizeInvocation, parseSkillArgv, KNOWN_WORKFLOWS } from '../../src/runtime/invocation.ts';
 
 void test('KNOWN_WORKFLOWS contains all required workflows', () => {
-  for (const w of ['init', 'knowledge-base', 'implementation-plan', 'code-gen-tdd', 'bugfix', 'archive', 'code-question', 'prd-clarify', 'influence-menu', 'mrd-to-code']) {
+  for (const w of ['knowledge-base', 'implementation-plan', 'code-gen-tdd', 'bugfix', 'archive', 'prd-clarify', 'influence-menu', 'mrd-to-code']) {
     assert.ok(KNOWN_WORKFLOWS.has(w as never), `missing ${w}`);
   }
 });
@@ -63,8 +63,8 @@ void test('normalizeInvocation: rejects Claude placeholders in args', () => {
   assert.throws(
     () =>
       normalizeInvocation(
-        { workflow: 'init', projectRoot: 'C:\\foo\\$HOME\\.claude\\bar' },
-        { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'init' }
+        { workflow: 'influence-menu', projectRoot: 'C:\\foo\\$HOME\\.claude\\bar' },
+        { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'influence-menu' }
       ),
     /Claude placeholder/
   );

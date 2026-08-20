@@ -19,13 +19,11 @@ import { ValidationError } from './errors.js';
 
 const KNOWN_WORKFLOWS: ReadonlySet<WorkflowId> = new Set<WorkflowId>([
   'mrd-to-code',
-  'init',
   'knowledge-base',
   'implementation-plan',
   'code-gen-tdd',
   'bugfix',
   'archive',
-  'code-question',
   'prd-clarify',
   'influence-menu',
 ]);

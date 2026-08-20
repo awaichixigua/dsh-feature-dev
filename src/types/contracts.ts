@@ -15,13 +15,11 @@
 /** All workflows the bundle knows about. */
 export type WorkflowId =
   | 'mrd-to-code'
-  | 'init'
   | 'knowledge-base'
   | 'implementation-plan'
   | 'code-gen-tdd'
   | 'bugfix'
   | 'archive'
-  | 'code-question'
   | 'prd-clarify'
   | 'influence-menu';
 

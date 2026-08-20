@@ -32,8 +32,17 @@ output: tech-design.md
 8. 附录 II（可选）：GitNexus 影响面分析
 9. 附录 III/IV（可选）：autoresearch 备注
 
+## 项目级通用工具约束
+
+若 `<projectRoot>/arch-docs/project-tools-index.md` 存在，必须在生成技术方案前按以下顺序执行：
+
+1. 读取索引，确认工具的触发关键词、详情路径和硬约束摘要。
+2. 根据 MRD、PRD、服务范围分析和候选改动判断命中的工具。
+3. 对每个命中工具，读取索引指定的 `arch-docs/project-tools/*.md` 详情，并将其中硬约束应用到技术方案、任务拆解、接口契约、测试策略和风险评估。
+
+索引不存在时静默跳过。若命中工具的详情文件缺失或无法读取，返回 `block`，在 `blocker` 中说明文件路径和解锁条件；不得凭经验继续生成技术方案。
+
 ## 硬规则
 
-- 始终先读 `arch-docs/project-tools-index.md`（如果存在）；如有任何匹配工具在 `arch-docs/project-tools/` 下缺少详细说明文件，返回 `block` 并写明解锁条件。
 - 不要引入没在设计里登记的全局类型。
 - 跨服务依赖必须在 `dependencies:` 段声明。

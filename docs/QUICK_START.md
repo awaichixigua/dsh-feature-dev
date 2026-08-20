@@ -26,11 +26,10 @@ dsh --profile web --dump-config
 打开业务项目所在的 DSH 会话后，可选地创建知识库时效标记并建立项目知识：
 
 ```text
-/init --project-root .
 /knowledge-base --project-root .
 ```
 
-`/init` 是可选步骤，只创建知识库时效标记；`/knowledge-base` 建立或刷新 `app-knowledge-base/`，让后续的服务路由和设计阶段有可读上下文。
+`/knowledge-base` 建立或刷新 `app-knowledge-base/`，让后续的服务路由和设计阶段有可读上下文。
 
 ## 从 MRD 到归档
 
@@ -64,7 +63,6 @@ dsh --profile web --dump-config
 | 目标 | 命令示例 |
 | --- | --- |
 | 单独澄清 MRD | `/prd-clarify --feature-dir req/create-order --clarify-mode=batch` |
-| 回答只读代码问题 | `/code-question 订单状态有哪些取值？` |
 | 变更前查看影响面 | `/influence-menu OrderService.charge` |
 | 修复已有需求中的 bug | `/bugfix --feature-dir req/create-order bug描述：支付失败后订单未回滚` |
 | 查看运行状态 | `/status --project-root . --feature-dir req/create-order` |

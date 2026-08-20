@@ -47,16 +47,14 @@ void test('JSON Schemas: 3 schemas are present and parse', () => {
   }
 });
 
-void test('All 9 SKILL.md files exist', () => {
+void test('All 8 SKILL.md files exist', () => {
   const expected = [
     'mrd-to-code',
-    'init',
     'knowledge-base',
     'implementation-plan',
     'code-gen-tdd',
     'bugfix',
     'archive',
-    'code-question',
     'prd-clarify',
     'influence-menu',
   ];

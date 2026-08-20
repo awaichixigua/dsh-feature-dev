@@ -25,7 +25,6 @@
 | `bugfix-fix` | `03_核心流程与逻辑层.md` | 修复代码时 |
 | `archive-report` | （无） | 只读 execution-state |
 | `kb-update` | （无） | 只对知识库做 diff |
-| `code-question` | `01_业务与领域知识层.md` | 回答业务问题时 |
 | `influence-menu` | （无） | 只读 `git grep` 与 service-catalog |
 
 单个阶段注入的知识库总行数**不得超过 350 行**。

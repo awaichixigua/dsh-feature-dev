@@ -7,13 +7,11 @@
 
 ```
 /mrd-to-code          End-to-end MRD → archive
-/init                 Optionally create a KB freshness marker
 /knowledge-base       Build / refresh the app knowledge base
 /implementation-plan  Generate PRD + tech design from MRD
 /code-gen-tdd         Generate code with a recoverable TDD loop
 /bugfix               Fix a bug inside an existing feature dir
 /archive              Archive a completed feature
-/code-question        Ask business-logic questions
 /prd-clarify          Run PRD clarification only
 /influence-menu       Show impact surface for a symbol
 ```
@@ -63,13 +61,11 @@ DSH:  Resolved. 0 pending.
 
 | Old | New |
 |---|---|
-| `/feature-dev:00-init` | `/init` |
 | `/feature-dev:01-knowledge-base` | `/knowledge-base` |
 | `/feature-dev:02-implementation-plan` | `/implementation-plan` |
 | `/feature-dev:03-code-gen-tdd` | `/code-gen-tdd` |
 | `/feature-dev:04-archive` | `/archive` |
 | `/feature-dev:bugfix` | `/bugfix` |
-| `/feature-dev:code-question` | `/code-question` |
 | `/feature-dev:prd-clarify` | `/prd-clarify` |
 | `/feature-dev:influence-menu` | `/influence-menu` |
 | `/feature-dev:fix-beads-duplicates` | (not in v0.1) |

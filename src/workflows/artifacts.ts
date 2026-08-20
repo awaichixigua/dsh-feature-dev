@@ -37,10 +37,6 @@ export function getArtifactsForWorkflow(
       return [
         { path: `${featureDir}/archive-report.md`, minSize: 100 },
       ];
-    case 'init':
-      return [
-        { path: `${inv.projectRoot}/app-knowledge-base/KB_FRESHNESS.md`, minSize: 10 },
-      ];
     case 'knowledge-base':
       return [
         { path: `${inv.projectRoot}/app-knowledge-base/CONTEXT.md`, minSize: 100 },

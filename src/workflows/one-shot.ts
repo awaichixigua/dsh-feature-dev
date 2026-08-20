@@ -2,7 +2,7 @@
  * One-shot workflow helper.
  *
  * Used by skills whose work fits in a single agent invocation
- * (init, knowledge-base, code-question, prd-clarify, influence-menu).
+ * (knowledge-base, prd-clarify, influence-menu).
  *
  * Runs a single subagent and validates declared artifacts. Real wiring.
  */
@@ -82,17 +82,13 @@ function subagentForWorkflow(workflow: FeatureDevInvocation['workflow']): string
   // The subagent name MUST point at a real file under `agents/`.
   // We map each one-shot workflow to the role whose prompt is closest
   // to its work:
-  //  - init           → init (writes the KB freshness marker)
   //  - knowledge-base → kb-update
-  //  - code-question  → code-question
   //  - prd-clarify    → mrd-clarify
   //  - influence-menu → influence-menu
   switch (workflow) {
-    case 'init': return 'init';
     case 'knowledge-base': return 'kb-update';
-    case 'code-question': return 'code-question';
     case 'prd-clarify': return 'mrd-clarify';
     case 'influence-menu': return 'influence-menu';
-    default: return 'code-question';
+    default: return 'influence-menu';
   }
 }
