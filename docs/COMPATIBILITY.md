@@ -1,51 +1,40 @@
-# DSH Compatibility Matrix
+# DSH 兼容性矩阵
 
-DSH is in **Developer Preview** and its public API may change. This document
-records the versions of the DSH peer dependencies that `dsh-feature-dev`
-is built and tested against, plus the changes we made to insulate the
-Workflow Core from those changes.
+DSH 处于 **Developer Preview** 阶段,公共 API 可能会变。本文档记录 `dsh-feature-dev` 构建和测试所基于的 DSH peer 依赖版本,以及我们为把 Workflow Core 与这些变更隔离开所做的调整。
 
-## Pinned peer deps
+## 固定的 peer 依赖
 
-| Package | Version range | Notes |
+| 包 | 版本范围 | 说明 |
 |---|---|---|
-| `@deepseek-ai/cordis` | `^0.0.0-dev.20260819` | `Context`, `apply`, `inject` |
-| `@deepseek-ai/dsh-skill` | `^0.0.0-dev.20260819` | `registerSkill`, `Skill` shape |
-| `@deepseek-ai/dsh-tools` | `^0.0.0-dev.20260819` | Tool registration |
-| `@deepseek-ai/dsh-subagent` | `^0.0.0-dev.20260819` | `spawnSubagent`, `appendAndAsk` |
+| `@deepseek-ai/cordis` | `^0.0.0-dev.20260819` | `Context`、`apply`、`inject` |
+| `@deepseek-ai/dsh-skill` | `^0.0.0-dev.20260819` | `registerSkill`、`Skill` 形态 |
+| `@deepseek-ai/dsh-tools` | `^0.0.0-dev.20260819` | Tool 注册 |
+| `@deepseek-ai/dsh-subagent` | `^0.0.0-dev.20260819` | `spawnSubagent`、`appendAndAsk` |
 | `@deepseek-ai/dsh-workflow` | `^0.0.0-dev.20260819` | `workflowEngine.start` |
 
-These versions are placeholders. The real first release will be pegged to
-the first DSH build that passes the integration tests.
+这些版本目前是占位值。首个正式发布版会固定到第一个通过集成测试的 DSH 构建上。
 
-## Adapter surface
+## 适配层范围
 
-To minimize the impact of DSH API churn, every DSH surface is hidden
-behind a single adapter:
+为最小化 DSH API 变更带来的影响,每个 DSH 接口都被隔离在唯一的适配器后面:
 
-| Adapter | Purpose |
+| 适配器 | 用途 |
 |---|---|
-| `src/index.ts` | The only file that knows the DSH `Context` shape. |
-| `src/skills/provider.ts` | The only file that calls `registerSkill`. |
-| `src/executors/spawn-port.ts` | The only file that imports `@deepseek-ai/dsh-subagent`'s `spawnSubagent`. |
-| `src/executors/inline.ts` | The only file that imports `appendAndAsk`. |
-| `src/tools/contract.ts` | The only place that decides the Tool result shape. |
+| `src/index.ts` | 唯一知道 DSH `Context` 形态的文件。 |
+| `src/skills/provider.ts` | 唯一调用 `registerSkill` 的文件。 |
+| `src/executors/spawn-port.ts` | 唯一引用 `@deepseek-ai/dsh-subagent` 的 `spawnSubagent` 的文件。 |
+| `src/executors/inline.ts` | 唯一引用 `appendAndAsk` 的文件。 |
+| `src/tools/contract.ts` | 唯一决定 Tool 返回结果形态的位置。 |
 
-If DSH renames any of those, we change the adapter and the rest of the
-bundle is unaffected.
+如果 DSH 重命名了上述任一项,我们只改适配器,bundle 的其余部分不受影响。
 
-## How we handle API changes
+## 如何应对 API 变更
 
-1. **Detection** — `scripts/verify-dsh-versions.ts` runs in CI and on
-   `pnpm verify:dsh`. It checks each peer dep is installed and reports
-   the resolved version.
-2. **Containment** — adapter files absorb the change. Workflow Core code
-   is not modified unless a semantic gap forces it.
-3. **Communication** — every DSH API bump adds a section to
-   `CHANGELOG.md` (TODO) and bumps the `cordis-bundle-api` field in
-   `package.json` `dsh:`.
+1. **检测** — `scripts/verify-dsh-versions.ts` 在 CI 中以及 `pnpm verify:dsh` 时运行。它会检查每个 peer 依赖是否已安装,并报告实际解析到的版本。
+2. **隔离** — 由适配层文件吸收变更。除非存在语义层面的 gap,否则不会修改 Workflow Core 代码。
+3. **沟通** — 每次 DSH API 升级都会在 `CHANGELOG.md`(TODO) 中加一节,并 bump `package.json` 的 `dsh:` 字段中的 `cordis-bundle-api`。
 
-## Cordis patch format
+## Cordis patch 格式
 
 ```yaml
 - insert:
@@ -63,24 +52,22 @@ bundle is unaffected.
 maxTokens，因此不要求额外的 DeepSeek API Key。需要按角色覆盖时，可显式增加
 `models.planning/coding/review/summary`；所填 provider 必须已在 DSH 中配置凭据。
 
-`cordis.patch.yml` is a deliberate subset of the full Cordis patch DSL.
-We rely on these specific keys; anything outside this set is ignored.
+`cordis.patch.yml` 是完整 Cordis patch DSL 的一个刻意精简的子集。我们只依赖其中这些特定键;超出这个集合的内容会被忽略。
 
-## Runtime profiles
+## 运行时 profile
 
-| Profile | Used for | Notes |
+| Profile | 用途 | 说明 |
 |---|---|---|
-| `web` | End-user dialog (recommended) | Full Skill/Tool surface |
-| `headless` | CI / scripted | Same surface, no UI |
+| `web` | 终端用户对话(推荐) | 完整的 Skill / Tool 表面 |
+| `headless` | CI / 脚本化 | 同样的表面,无 UI |
 
-The bundle does not register any profile-specific code.
+bundle 本身不为特定 profile 注册任何专属代码。
 
-## What DSH must provide
+## DSH 必须提供的能力
 
-- A `Context` object whose `registerSkill` is callable.
-- A way to expose a Tool from a Bundle to the dialog (e.g. `registerTool`).
-- A `workflowEngine` service to drive long-running workflows.
-- A Subagent system that can run a child agent with a given prompt path
-  and inputs, and return a string.
+- 一个 `Context` 对象,其 `registerSkill` 可调用。
+- 一种把 Bundle 中的 Tool 暴露给对话的机制(如 `registerTool`)。
+- 一个 `workflowEngine` 服务,用来驱动长时间运行的工作流。
+- 一个能根据给定的 prompt 路径和入参运行子 agent、并返回字符串的子 agent 系统。
 
-We do not depend on any UI hooks, hook bridge, or model-specific routing.
+我们不依赖任何 UI 钩子、hook bridge 或模型专属的路由。
