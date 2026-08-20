@@ -1,0 +1,18 @@
+{
+  "project": {
+    "name": "order-service",
+    "tech_stack": "java-spring-boot",
+    "test_framework": "junit5+mockito",
+    "package_manager": "maven",
+    "directory_convention": "layered"
+  },
+  "knowledge_base": {
+    "root": "app-knowledge-base/",
+    "context_file": "app-knowledge-base/CONTEXT.md"
+  },
+  "code_gen": {
+    "template_set": "java-spring-boot-v2",
+    "mock_strategy": "mock-first"
+  },
+  "plugin_availability": {}
+}

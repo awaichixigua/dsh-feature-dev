@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh-feature-dev.local/schemas/invocation.schema.json",
+  "title": "FeatureDevInvocation",
+  "type": "object",
+  "required": ["workflow", "projectRoot", "options"],
+  "additionalProperties": false,
+  "properties": {
+    "workflow": {
+      "type": "string",
+      "enum": [
+        "mrd-to-code",
+        "init",
+        "knowledge-base",
+        "implementation-plan",
+        "code-gen-tdd",
+        "bugfix",
+        "archive",
+        "code-question",
+        "prd-clarify",
+        "influence-menu"
+      ]
+    },
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "featureDir": { "type": "string" },
+    "featureId": { "type": "string" },
+    "target": { "type": "string" },
+    "mrdUrl": { "type": "string", "format": "uri" },
+    "bugDescription": { "type": "string" },
+    "rawUserRequest": { "type": "string" },
+    "options": {
+      "type": "object",
+      "required": ["resume", "unitTests", "generateUnitTestsOnly"],
+      "additionalProperties": false,
+      "properties": {
+        "resume": { "type": "boolean" },
+        "unitTests": { "type": "boolean" },
+        "generateUnitTestsOnly": { "type": "boolean" },
+        "clarifyMode": { "type": "string", "enum": ["dialogue", "batch"] },
+        "skipMrdClarify": { "type": "boolean" },
+        "singlePhase": { "type": "string" }
+      }
+    },
+    "modelOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "planning": { "type": "object" },
+        "coding": { "type": "object" },
+        "review": { "type": "object" },
+        "summary": { "type": "object" }
+      }
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh-feature-dev.local/schemas/execution-state.schema.json",
+  "title": "ExecutionState",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runId",
+    "workflow",
+    "projectRoot",
+    "featureDir",
+    "currentPhase",
+    "phaseHistory",
+    "startedAt",
+    "updatedAt",
+    "status",
+    "repairCount",
+    "agentCount",
+    "pendingConfirmations"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "runId": { "type": "string" },
+    "workflow": {
+      "type": "string",
+      "enum": [
+        "mrd-to-code",
+        "init",
+        "knowledge-base",
+        "implementation-plan",
+        "code-gen-tdd",
+        "bugfix",
+        "archive",
+        "code-question",
+        "prd-clarify",
+        "influence-menu"
+      ]
+    },
+    "activeWorkflow": {
+      "type": "string",
+      "enum": ["implementation-plan", "code-gen-tdd", "archive"]
+    },
+    "orchestratorWorkflow": {
+      "type": "string",
+      "const": "mrd-to-code"
+    },
+    "projectRoot": { "type": "string" },
+    "featureDir": { "type": "string" },
+    "featureId": { "type": "string" },
+    "bugDescription": { "type": "string" },
+    "currentPhase": { "type": "string" },
+    "phaseHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["phase", "status", "startedAt"],
+        "properties": {
+          "phase": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "pass", "warn", "block", "failed"] },
+          "startedAt": { "type": "string" },
+          "endedAt": { "type": "string" },
+          "summary": { "type": "string" },
+          "artifacts": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "startedAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "status": { "type": "string", "enum": ["running", "paused", "completed", "blocked", "interrupted", "failed", "aborted"] },
+    "repairCount": { "type": "integer", "minimum": 0 },
+    "agentCount": { "type": "integer", "minimum": 0 },
+    "pendingConfirmations": { "type": "array" },
+    "lastPhaseResult": { "type": "object" },
+    "modelOverrides": {
+      "type": "object",
+      "properties": {
+        "planning": { "$ref": "#/$defs/modelRoute" },
+        "coding": { "$ref": "#/$defs/modelRoute" },
+        "review": { "$ref": "#/$defs/modelRoute" },
+        "summary": { "$ref": "#/$defs/modelRoute" }
+      },
+      "additionalProperties": false
+    },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "modelRoute": {
+      "type": "object",
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh-feature-dev.local/schemas/phase-result.schema.json",
+  "title": "PhaseResult",
+  "type": "object",
+  "required": ["status", "summary", "artifacts", "evidence", "changedFiles"],
+  "additionalProperties": false,
+  "properties": {
+    "status": { "type": "string", "enum": ["pass", "warn", "block", "failed"] },
+    "summary": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "changedFiles": { "type": "array", "items": { "type": "string" } },
+    "blocker": { "type": "string" },
+    "metrics": { "type": "object", "additionalProperties": { "type": "number" } }
+  }
+}

@@ -1,0 +1,41 @@
+# Build artifacts
+lib/
+.tsdown/
+*.tsbuildinfo
+
+# Node
+node_modules/
+.npm/
+.eslintcache
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temporary
+.tmp/
+tmp/
+.cache/
+# Local scratch / revert buffers (e.g. feature revert before mavis trash is available)
+_trash/
