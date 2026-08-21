@@ -10,6 +10,8 @@ argument-hint: <MRD URL> --feature-dir <path> [--clarify-mode=dialogue|batch]
 
 用于从 MRD 启动完整需求交付。编排器依次运行实施方案、TDD 实现与归档，并使用一份持久化状态。
 
+`--feature-dir` 必填，使用 `{版本号}_{需求编号}_{中文需求标题}` 形式。MRD 读取和服务路由会在 `.tmp/<feature-dir 的目录名>` 中暂存，目录由 runtime 管理，不能替代正式需求目录名；既然已提供 `featureDir`，不再使用 MRD URL hash。若服务范围无法自动识别，主会话负责收集服务及仓库路径并写入暂存 `apps.json`；恢复后不重新启动 app-router。
+
 ```text
 /mrd-to-code https://example.com/share_doc/?token=xxx --feature-dir req/create-order
 ```

@@ -464,9 +464,13 @@ export class StateRepository {
       lines.push(`- **类型**: \`${state.pendingMainAction.kind}\``);
       lines.push(`- **说明**: ${state.pendingMainAction.instruction}`);
       lines.push(`- **MRD 输入**: \`${state.pendingMainAction.mrdOriginalPath}\``);
-      lines.push(`- **澄清输出**: \`${state.pendingMainAction.mrdClarifiedPath}\``);
-      if (state.pendingMainAction.knowledgeBasePath) {
-        lines.push(`- **知识库**: \`${state.pendingMainAction.knowledgeBasePath}\``);
+      if (state.pendingMainAction.kind === 'clarify_mrd') {
+        lines.push(`- **澄清输出**: \`${state.pendingMainAction.mrdClarifiedPath}\``);
+        if (state.pendingMainAction.knowledgeBasePath) {
+          lines.push(`- **知识库**: \`${state.pendingMainAction.knowledgeBasePath}\``);
+        }
+      } else {
+        lines.push(`- **服务路由输出**: \`${state.pendingMainAction.appsPath}\``);
       }
       lines.push('');
     }

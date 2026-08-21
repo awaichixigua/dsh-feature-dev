@@ -15,7 +15,7 @@
  */
 
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve, sep, isAbsolute } from 'node:path';
+import { basename, dirname, resolve, sep, isAbsolute } from 'node:path';
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -27,11 +27,18 @@ export interface PathContext {
 }
 
 /**
- * Legacy implementation-plan staging layout.  The MRD must be fetched into
- * a URL-addressed directory before we know which service owns the request;
- * using the URL fingerprint prevents unrelated MRDs from sharing a cache.
+ * Resolve the temporary directory used before routing selects a service.
+ * A required feature directory gives the run a stable business identity, so
+ * it takes precedence over the legacy URL hash. The hash remains a fallback
+ * for older low-level callers that genuinely have no feature identity.
  */
-export function resolveMrdStagingDir(projectRoot: string, mrdUrl: string): string {
+export function resolveMrdStagingDir(projectRoot: string, mrdUrl: string, featureDir?: string): string {
+  if (featureDir) {
+    const name = basename(featureDir);
+    if (name && name !== '.' && name !== '..') {
+      return resolve(projectRoot, '.tmp', name);
+    }
+  }
   const fingerprint = createHash('sha256').update(mrdUrl).digest('hex').slice(0, 12);
   return resolve(projectRoot, '.tmp', `mrdoc-${fingerprint}`);
 }

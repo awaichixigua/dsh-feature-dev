@@ -135,3 +135,12 @@ void test('resolveMrdStagingDir: uses a stable URL fingerprint below project .tm
   assert.match(a.replace(/\\/g, '/'), /\/\.tmp\/mrdoc-[a-f0-9]{12}$/);
   assert.notEqual(a, c);
 });
+
+void test('resolveMrdStagingDir: feature identity replaces the legacy URL hash', () => {
+  const root = process.platform === 'win32' ? 'D:\\work\\aggregate' : '/work/aggregate';
+  const name = '2.0.0_103111_fastjson替换为jackson';
+  const a = resolveMrdStagingDir(root, 'https://example.com/share_doc/?token=one', name);
+  const b = resolveMrdStagingDir(root, 'https://example.com/share_doc/?token=two', name);
+  assert.equal(a, join(root, '.tmp', name));
+  assert.equal(a, b);
+});

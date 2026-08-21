@@ -42,7 +42,7 @@ const PROJECT_ROOT = {
 
 const FEATURE_DIR = {
   type: 'string' as const,
-  description: '需求目录路径（绝对路径或相对 projectRoot）。示例：`req/create-order`。单次工作流 knowledge-base、prd-clarify、influence-menu 可省略；code-gen-tdd、implementation-plan、mrd-to-code、bugfix、archive 必填。',
+  description: '需求目录路径（绝对路径或相对 projectRoot）。示例：`req/2.1.10_98532_订单创建`。implementation-plan 与 mrd-to-code 的 MRD URL 启动必须提供；运行会先在 `.tmp/<需求目录名>` 暂存，既然已提供目录名则不再使用 MRD URL hash，服务路由和分支门禁后才沉淀到正式目录。单次工作流 knowledge-base、prd-clarify、influence-menu 可省略。',
 } as const;
 
 const WORKFLOW = {

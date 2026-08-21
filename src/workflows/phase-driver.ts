@@ -108,7 +108,7 @@ export async function drivePhases(
       await phase.afterPass(state, inv, deps);
     }
 
-    if (phase.gate && result.status !== 'block' && result.status !== 'failed') {
+    if (phase.gate && !result.gateAlreadyConfirmed && result.status !== 'block' && result.status !== 'failed') {
       // deps.repo may be switched by a successful phase (the implementation
       // plan moves from URL-hash staging to its routed service directory), so
       // bind the gate to the current repository rather than the one captured

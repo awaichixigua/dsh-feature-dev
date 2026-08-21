@@ -84,7 +84,7 @@ export async function runFeatureDev(
         throw new Error('implementation-plan requires featureDir so the routed service requirement directory can be named');
       }
       inv.featureId ??= basename(inv.featureDir);
-      inv.featureDir = resolveMrdStagingDir(inv.projectRoot, inv.mrdUrl);
+      inv.featureDir = resolveMrdStagingDir(inv.projectRoot, inv.mrdUrl, inv.featureId);
     }
     const repo = new StateRepository({
       projectRoot: inv.projectRoot,

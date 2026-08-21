@@ -12,7 +12,7 @@ Before service routing, `stagingFeatureDir` is the only writable document direct
 
 ## 需求分支交接
 
-将路由结果写入 `<featureDir>/apps.json`。除现有服务分类外，JSON **必须**包含 `repositories` 对象，为每个 `primary` 和 `collaborators` 服务映射其 Git 仓库路径。路径可以是绝对路径，也可以相对于 `projectRoot`；不得包含只读服务。示例：
+将路由结果写入 `<stagingFeatureDir>/apps.json`。除现有服务分类外，JSON **必须**包含 `repositories` 对象，为每个 `primary` 和 `collaborators` 服务映射其 Git 仓库路径。路径可以是绝对路径，也可以相对于 `projectRoot`；不得包含只读服务。示例：
 
 ```json
 {
@@ -26,7 +26,7 @@ Before service routing, `stagingFeatureDir` is the only writable document direct
 }
 ```
 
-若无法解析可写服务的仓库路径，返回 `block`。后续的分支门禁将使用该字段拉取、创建和切换分支，不得猜测路径。
+若无法解析可写服务的仓库路径，仍将已识别内容（包括空数组、`uncertain` 和 `reasons`）写入 `apps.json`，并返回 `block`。后续由父工作流在**主会话**收集用户确认并补全 `repositories`；不得猜测路径、不得在子代理会话中向用户提问。
 
 读取 `arch-docs/service-catalog.md` 和 `arch-docs/service-dependencies.md`，
 识别当前 MRD 涉及的服务，写出 `apps.json`。

@@ -41,13 +41,16 @@ export async function implementationPlan(
     },
     {
       name: 'SERVICE_ROUTER',
-      artifacts: (current) => [{ path: `${current.featureDir}/apps.json`, minSize: 2, mustContain: ['repositories'] }],
+      // The router may legitimately be unable to identify a service from an
+      // infrastructure-only MRD. In that case the main conversation, rather
+      // than artifact validation, owns the service-scope question.
+      artifacts: [],
       // Branch preparation can fetch, switch, create, and push branches in
       // every writable service. Require the user to approve app-router's
       // scope before performing any of those repository mutations.
       gate: 'post_service_router',
       subagent: 'app-router',
-      run: makeRunner('app-router'),
+      run: runServiceRouter,
     },
     {
       name: 'BRANCH_GATE',
@@ -218,6 +221,122 @@ function makeRunner(subagent: string) {
       };
     }
   };
+}
+
+/**
+ * Keep service-routing uncertainty in the main conversation. Previously the
+ * generic apps.json artifact check converted an incomplete route into a
+ * failed phase, so no confirmation gate or actionable user prompt survived.
+ */
+async function runServiceRouter(
+  state: ExecutionState,
+  inv: FeatureDevInvocation,
+  deps: RunnerDeps
+): Promise<PhaseResult> {
+  const featureDir = resolve(inv.featureDir ?? state.featureDir);
+  const appsPath = resolve(featureDir, 'apps.json');
+  const mrdOriginalPath = resolve(featureDir, 'mrd-original.md');
+  const pending = state.pendingMainAction;
+  const existing = inspectServiceRoute(appsPath);
+
+  // A resumed main-conversation answer is authoritative. Do not spawn
+  // app-router again and overwrite the user-confirmed service scope.
+  if (pending?.kind === 'route_services') {
+    if (existing.ok) {
+      delete state.pendingMainAction;
+      return {
+        status: 'pass',
+        summary: '主会话已确认服务范围，继续准备需求分支',
+        artifacts: [appsPath],
+        evidence: [`service_route_confirmed:${appsPath}`],
+        changedFiles: [],
+        gateAlreadyConfirmed: true,
+      };
+    }
+    return routeServicesMainAction(state, mrdOriginalPath, appsPath, existing);
+  }
+
+  const result = await makeRunner('app-router')(state, inv, deps);
+  // Infrastructure/runtime failures still need an operator fix; they are not
+  // evidence that the user should choose a service scope.
+  if (result.status === 'failed' && result.evidence.some((item) => item.startsWith('subagent_failure:'))) {
+    return result;
+  }
+  const inspected = inspectServiceRoute(appsPath);
+  // A router-side block carries unresolved semantics even when its partial
+  // apps.json happens to be structurally complete. Surface it to the main
+  // conversation instead of losing the user's input opportunity.
+  if (result.status === 'block' || !inspected.ok) {
+    return routeServicesMainAction(state, mrdOriginalPath, appsPath, inspected);
+  }
+  return result;
+}
+
+function routeServicesMainAction(
+  state: ExecutionState,
+  mrdOriginalPath: string,
+  appsPath: string,
+  route: ServiceRouteInspection
+): PhaseResult {
+  state.pendingMainAction = {
+    kind: 'route_services',
+    mrdOriginalPath,
+    appsPath,
+    ...(route.snapshot ? { routeSnapshot: route.snapshot } : {}),
+    instruction: '由主会话向用户发起服务范围确认输入：确认 primary、collaborators、readOnly，以及每个 primary/collaborator 的 repositories 路径。将确认结果写入 apps.json 后，用同一 projectRoot 和 featureDir 调用 feature_dev_resume；不要重新启动 app-router，也不要创建正式 req 目录。',
+  };
+  return {
+    status: 'block',
+    summary: '无法从 MRD 自动确认服务范围，等待主会话收集服务路由输入',
+    artifacts: [],
+    evidence: ['main_action:route_services', ...route.problems.map((problem) => `service_route:${problem}`)],
+    changedFiles: [],
+    blocker: `请由主会话确认服务范围并写入 ${appsPath}（${route.problems.join('；')}）`,
+  };
+}
+
+interface ServiceRouteInspection {
+  ok: boolean;
+  problems: string[];
+  snapshot?: Record<string, unknown>;
+}
+
+function inspectServiceRoute(appsPath: string): ServiceRouteInspection {
+  if (!existsSync(appsPath)) return { ok: false, problems: ['apps.json 不存在'] };
+  let value: unknown;
+  try {
+    value = JSON.parse(readFileSync(appsPath, 'utf8'));
+  } catch {
+    return { ok: false, problems: ['apps.json 不是合法 JSON'] };
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, problems: ['apps.json 必须是对象'] };
+  }
+  const snapshot = value as Record<string, unknown>;
+  const primary = serviceNames(snapshot.primary, 'primary');
+  const collaborators = serviceNames(snapshot.collaborators, 'collaborators');
+  const problems = [...primary.problems, ...collaborators.problems];
+  if (primary.names.length === 0) problems.push('primary 至少需要一个主改服务');
+  const repositories = snapshot.repositories;
+  if (!repositories || typeof repositories !== 'object' || Array.isArray(repositories)) {
+    problems.push('repositories 必须提供主改和协同服务的仓库路径');
+  } else {
+    for (const service of [...new Set([...primary.names, ...collaborators.names])]) {
+      const path = (repositories as Record<string, unknown>)[service];
+      if (typeof path !== 'string' || !path.trim()) {
+        problems.push(`repositories.${service} 缺少仓库路径`);
+      }
+    }
+  }
+  return { ok: problems.length === 0, problems, snapshot };
+}
+
+function serviceNames(value: unknown, field: string): { names: string[]; problems: string[] } {
+  if (value === undefined) return { names: [], problems: [] };
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || !item.trim())) {
+    return { names: [], problems: [`${field} 必须是服务名数组`] };
+  }
+  return { names: value.map((item) => item.trim()), problems: [] };
 }
 
 async function awaitMainConversationClarification(

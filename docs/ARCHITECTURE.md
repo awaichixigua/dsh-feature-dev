@@ -77,7 +77,7 @@ INITIALIZED
   → COMPLETED
 ```
 
-它生成 `mrd-original.md`、`mrd-clarified.md`、`prd.md` 和 `tech-design.md`。其中 MRD 澄清由主会话完成：runtime 以 `pendingMainAction` 返回正式需求目录和输入/输出路径，主会话写入澄清文档后恢复，工作流只做本地校验并直接进入 PRD，不会启动澄清子代理。`post_service_router` 门在服务路由产出 `apps.json` 后触发，用户确认服务范围后才会准备服务需求分支。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
+它生成 `mrd-original.md`、`mrd-clarified.md`、`prd.md` 和 `tech-design.md`。启动时 `featureDir` 是正式需求目录名的必填输入，URL 的抓取、MRD 解析和服务路由首先在 `.tmp/<featureDir 的目录名>` 中运行；既然已提供需求标识，不再使用 MRD URL hash，只有需求分支准备成功才沉淀到正式目录。若 app-router 无法从 MRD 确认可写服务，runtime 返回 `pendingMainAction.kind = route_services`，主会话收集并写入 `apps.json` 后恢复，不重新启动 app-router；这次用户输入即服务范围确认，随后直接进入分支门禁。MRD 澄清同样由主会话完成：runtime 返回 `pendingMainAction` 的输入/输出路径，主会话写入澄清文档后恢复，工作流只做本地校验并直接进入 PRD，不会启动澄清子代理。正常自动路由时，`post_service_router` 门仍在服务路由产出 `apps.json` 后触发。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
 
 ### code-gen-tdd
 

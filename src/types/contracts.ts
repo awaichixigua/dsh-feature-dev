@@ -104,6 +104,8 @@ export interface PhaseResult {
   bugClassification?: 'code_defect' | 'business_requirement';
   /** Bugfix-only, relative to featureDir: `bugfix/<number>-<slug>`. */
   bugCaseDir?: string;
+  /** The main conversation already collected the human confirmation for this phase. */
+  gateAlreadyConfirmed?: boolean;
 }
 
 /** Phases of the Code Gen TDD state machine (TECH_DESIGN.md §9.3). */
@@ -178,12 +180,23 @@ export interface ExecutionState {
   notes?: string[];
 }
 
-export interface PendingMainAction {
+export type PendingMainAction = ClarifyMrdMainAction | RouteServicesMainAction;
+
+export interface ClarifyMrdMainAction {
   kind: 'clarify_mrd';
   mode: 'dialogue' | 'batch';
   mrdOriginalPath: string;
   mrdClarifiedPath: string;
   knowledgeBasePath?: string;
+  instruction: string;
+}
+
+/** Service routing could not determine writable repositories from the MRD. */
+export interface RouteServicesMainAction {
+  kind: 'route_services';
+  mrdOriginalPath: string;
+  appsPath: string;
+  routeSnapshot?: Record<string, unknown>;
   instruction: string;
 }
 

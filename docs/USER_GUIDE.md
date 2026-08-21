@@ -17,10 +17,18 @@
 
 `/bugfix` 会先跑一个只读的 LOCATE 阶段,然后暂停并展示定位证据与修复方向。源码或文档的改动**必须**在用户确认 `proceed` 之后才开始。
 
+## MRD 工作流的需求目录
+
+`/implementation-plan` 和 `/mrd-to-code` 都必须提供 `--feature-dir`，目录名使用 `{版本号}_{需求编号}_{中文需求标题}`，例如 `req/2.0.0_103111_fastjson替换为jackson`。这个参数定义后续需求分支与正式文档目录，不能省略或使用临时占位名。
+
+MRD URL 的下载、解析和服务路由会先在 `<projectRoot>/.tmp/<featureDir 的目录名>` 中运行；`.tmp` 只是运行时暂存目录，不需要用户传入，也不会取代 `featureDir`。因为 `featureDir` 已经唯一标识本次需求，暂存目录不再使用 MRD URL hash。服务范围确认且需求分支准备完成后，状态与文档才迁移到主服务仓库下的正式 `req/<目录名>`。
+
+若 app-router 无法仅依据 MRD 确定服务范围，主会话会显示服务范围输入，要求补充 `primary`、`collaborators`、`readOnly` 及可写服务的仓库路径。回答后主会话写入暂存目录的 `apps.json` 并恢复工作流；不会重新启动 app-router 或重复要求确认同一范围。
+
 ## 端到端示例
 
 ```text
-User: /mrd-to-code https://example.com/share_doc/?token=abc
+User: /mrd-to-code https://example.com/share_doc/?token=abc --feature-dir req/2.0.0_103111_fastjson替换为jackson
 DSH:  正在阅读 MRD... 在继续之前请先回答 3 个问题。
 User: 1) 按次计费, 2) 是幂等的, 3) 美元
 DSH:  已写入 <featureDir>/mrd-clarified.md。服务路由:order-svc (主), payment-svc (协作)。
