@@ -39,7 +39,7 @@ dsh --profile web --dump-config
 /mrd-to-code https://example.com/share_doc/?token=xxx --feature-dir req/create-order
 ```
 
-它依次完成：MRD 读取与澄清、服务路由、PRD、技术方案、TDD 实现和归档。工作流在 PRD、技术方案和测试规格等需要决策的位置暂停。阅读提示后选择操作，例如：
+它依次完成：MRD 读取与澄清、服务路由、PRD、技术方案、TDD 实现和归档。服务路由后会先展示 `apps.json`，确认服务范围正确后才会准备服务需求分支；工作流也会在 PRD、技术方案和测试规格等需要决策的位置暂停。阅读提示后选择操作，例如：
 
 ```text
 /confirm --project-root . --feature-dir req/create-order --gate pre_prd --choice accept

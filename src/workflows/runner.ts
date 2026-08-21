@@ -29,7 +29,7 @@ export interface RunnerDeps {
   /**
    * The implementation-plan flow starts in an MRD hash staging directory and
    * switches this repository to the routed service requirement directory
-   * after its branch gate passes.
+   * after the service branch gate passes, before MRD clarification begins.
    */
   repo: StateRepository;
   created: boolean;

@@ -8,7 +8,7 @@ output: mrd-clarified.md
 
 # Agent: mrd-clarify
 
-Before service routing, use only `stagingFeatureDir`; no formal `featureDir` exists yet. Read `mrdOriginalPath` from staging and write any clarification artifact to the same staging directory.
+Run only after service routing and the requirement-branch gate. `featureDir` is the primary service repository's `req/<feature>` directory: read its `mrdOriginalPath` and write clarification artifacts there. Never write clarification artifacts to URL-hash staging.
 
 驱动澄清对话（或批量澄清）。**模型不替用户做决定**——只负责提问、接收、落盘。
 
@@ -19,8 +19,9 @@ Before service routing, use only `stagingFeatureDir`; no formal `featureDir` exi
 
 ## 输入
 
-- `mrdOriginalPath` —— 已暂存的 `mrd-original.md`
-- `kbContextPath` —— `app-knowledge-base/CONTEXT.md`（按需读取）
+- `mrdOriginalPath` —— 服务仓库内的 `mrd-original.md`
+- `kb_local_path` —— service repository `app-knowledge-base/`; provided only when `CONTEXT.md` exists and must be used for cross-validation
+- `kbContextPath` —— `kb_local_path/CONTEXT.md` (compatibility input; read on demand)
 - `mode` — `dialogue` | `batch`
 - `currentAnswer` —— 仅在恢复时使用
 

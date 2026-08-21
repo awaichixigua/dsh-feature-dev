@@ -68,13 +68,14 @@ async function runUntilGate(project: string) {
   // Wipe in case
   rmSync(repo.aiDir, { recursive: true, force: true });
   const state = repo.create({ workflow: 'implementation-plan', projectRoot: project, featureDir });
-  // Manually mark the first 3 phases as pass so the next phase is PRD (which raises pre_prd)
+  // Manually mark all pre-PRD phases as pass so the next phase is PRD (which raises pre_prd).
   const { runWorkflow } = await import('../../src/workflow/runner.js').catch(() => import('../../src/workflows/runner.js'));
   // Walk through the phases manually by transitioning the state
   state.currentPhase = 'PRD';
   state.phaseHistory.push({ phase: 'MRD_READER', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' });
-  state.phaseHistory.push({ phase: 'CLARIFY', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' });
   state.phaseHistory.push({ phase: 'SERVICE_ROUTER', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' });
+  state.phaseHistory.push({ phase: 'BRANCH_GATE', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' });
+  state.phaseHistory.push({ phase: 'CLARIFY', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' });
   // Begin PRD
   state.phaseHistory.push({ phase: 'PRD', status: 'pending', startedAt: new Date().toISOString() });
   state.updatedAt = new Date().toISOString();
@@ -144,7 +145,7 @@ void test('revise rewinds currentPhase to the gate-associated phase', async () =
     const after = await statusFeatureDev(ctx, { projectRoot: project, featureDir });
     assert.equal(after.ok, true);
     if (!after.ok) return;
-    assert.equal(after.data.currentPhase, 'SERVICE_ROUTER');
+    assert.equal(after.data.currentPhase, 'CLARIFY');
     assert.equal(after.data.status, 'running');
   } finally {
     rmSync(project, { recursive: true, force: true });

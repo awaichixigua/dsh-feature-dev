@@ -99,14 +99,6 @@ void test('nextPhaseFromResult: implementation-plan order', () => {
     evidence: [],
     changedFiles: [],
   });
-  assert.equal(p, 'CLARIFY');
-  p = nextPhaseFromResult('implementation-plan', p, {
-    status: 'pass',
-    summary: '',
-    artifacts: [],
-    evidence: [],
-    changedFiles: [],
-  });
   assert.equal(p, 'SERVICE_ROUTER');
   p = nextPhaseFromResult('implementation-plan', p, {
     status: 'pass',
@@ -116,6 +108,14 @@ void test('nextPhaseFromResult: implementation-plan order', () => {
     changedFiles: [],
   });
   assert.equal(p, 'BRANCH_GATE');
+  p = nextPhaseFromResult('implementation-plan', p, {
+    status: 'pass',
+    summary: '',
+    artifacts: [],
+    evidence: [],
+    changedFiles: [],
+  });
+  assert.equal(p, 'CLARIFY');
 });
 
 void test('nextPhaseFromResult: a blocked linear workflow stops immediately', () => {

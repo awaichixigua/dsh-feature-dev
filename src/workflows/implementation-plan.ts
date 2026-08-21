@@ -1,7 +1,8 @@
 /**
  * Implementation Plan workflow.
  *
- * Phases: INITIALIZED -> MRD_READER -> CLARIFY -> SERVICE_ROUTER -> PRD -> TECH_DESIGN -> COMPLETED
+ * Phases: INITIALIZED -> MRD_READER -> SERVICE_ROUTER -> [service scope confirmation]
+ * -> BRANCH_GATE -> CLARIFY -> PRD -> TECH_DESIGN -> COMPLETED
  *
  * Each phase runs a real Subagent via the `SubagentExecutor` injected
  * into `RunnerDeps`. PhaseRequest inputs carry the project context.
@@ -16,7 +17,7 @@ import type {
 import type { RunnerDeps } from './runner.js';
 import { drivePhases, type PhaseSpec } from './phase-driver.js';
 import { GateEngine } from '../runtime/gate-engine.js';
-import { basename, isAbsolute, resolve } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { StateRepository } from '../runtime/state-repository.js';
 import { isInside } from '../runtime/paths.js';
@@ -38,14 +39,12 @@ export async function implementationPlan(
       run: makeRunner('mrd-reader'),
     },
     {
-      name: 'CLARIFY',
-      artifacts: [],
-      subagent: 'mrd-clarify',
-      run: makeRunner('mrd-clarify'),
-    },
-    {
       name: 'SERVICE_ROUTER',
       artifacts: (current) => [{ path: `${current.featureDir}/apps.json`, minSize: 2, mustContain: ['repositories'] }],
+      // Branch preparation can fetch, switch, create, and push branches in
+      // every writable service. Require the user to approve app-router's
+      // scope before performing any of those repository mutations.
+      gate: 'post_service_router',
       subagent: 'app-router',
       run: makeRunner('app-router'),
     },
@@ -68,6 +67,15 @@ export async function implementationPlan(
         };
       },
       afterPass: (current, currentInv, currentDeps) => settleDocumentsIntoService(current, currentInv, currentDeps),
+    },
+    {
+      // Clarification intentionally runs only after routing and the branch
+      // gate have selected a concrete primary service repository. This gives
+      // the agent the service-owned MRD and knowledge-base path to cross-check.
+      name: 'CLARIFY',
+      artifacts: [],
+      subagent: 'mrd-clarify',
+      run: makeRunner('mrd-clarify'),
     },
     {
       name: 'PRD',
@@ -167,6 +175,9 @@ function makeRunner(subagent: string) {
   return async (state: ExecutionState, inv: FeatureDevInvocation, deps: RunnerDeps): Promise<PhaseResult> => {
     const promptPath = resolveAgentPromptPath(deps.ctx.packageRoot, 'implementation-plan', subagent);
     const usesStagingOnly = isPreRoutingSubagent(subagent);
+    const kbLocalPath = subagent === 'mrd-clarify'
+      ? resolveServiceKnowledgeBase(inv.featureDir)
+      : undefined;
     const req: PhaseRequest = {
       runId: state.runId,
       workflow: 'implementation-plan',
@@ -183,6 +194,10 @@ function makeRunner(subagent: string) {
         ...(subagent === 'mrd-clarify' || subagent === 'app-router'
           ? { mrdOriginalPath: resolve(inv.featureDir ?? inv.projectRoot, 'mrd-original.md') }
           : {}),
+        ...(kbLocalPath ? {
+          kb_local_path: kbLocalPath,
+          kbContextPath: join(kbLocalPath, 'CONTEXT.md'),
+        } : {}),
         options: inv.options,
         ...(subagent === 'prd-generator'
           ? { prdTemplatePath: resolve(deps.ctx.packageRoot, 'templates', 'prd-template.md') }
@@ -211,9 +226,21 @@ function makeRunner(subagent: string) {
   };
 }
 
-/** The first three phases operate exclusively on URL-hash staging. */
+/** Only MRD retrieval and service routing operate on URL-hash staging. */
 function isPreRoutingSubagent(subagent: string): boolean {
-  return subagent === 'mrd-reader' || subagent === 'mrd-clarify' || subagent === 'app-router';
+  return subagent === 'mrd-reader' || subagent === 'app-router';
+}
+
+/**
+ * A knowledge base belongs to a service repository, never to the shared
+ * aggregate project. Return it only when its L0 context is available so the
+ * clarification agent can safely fall back to MRD-only mode when it is not.
+ */
+function resolveServiceKnowledgeBase(featureDir: string | undefined): string | undefined {
+  if (!featureDir) return undefined;
+  const serviceRepo = resolve(featureDir, '..', '..');
+  const kbLocalPath = resolve(serviceRepo, 'app-knowledge-base');
+  return existsSync(join(kbLocalPath, 'CONTEXT.md')) ? kbLocalPath : undefined;
 }
 
 function inferPhaseFromSubagent(name: string): string {

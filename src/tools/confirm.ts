@@ -52,6 +52,7 @@ const ACCEPT_CHOICES = new Set(['accept', 'proceed']);
 /** Map a gate name to the phase that raised it. */
 const GATE_TO_PHASE: Record<string, string> = {
   post_locate: 'LOCATE',
+  post_service_router: 'SERVICE_ROUTER',
   pre_prd: 'PRD',
   post_test_spec: 'PHASE1_TEST_SPEC',
   pre_tech_design: 'TECH_DESIGN',

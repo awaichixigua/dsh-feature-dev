@@ -8,9 +8,11 @@ argument-hint: <MRD URL> --feature-dir <需求目录名> [--clarify-mode=dialogu
 
 # implementation-plan
 
-MRD URL 会先抓取到 `<projectRoot>/.tmp/mrdoc-<sha256(url)[:12]>`。服务路由和需求分支门禁通过后，文档和运行状态才沉淀到 `<主服务仓库>/req/<feature-dir 的目录名>`；hash 目录保留为原始输入审计记录。
+MRD URL 会先抓取到 `<projectRoot>/.tmp/mrdoc-<sha256(url)[:12]>`。服务路由和需求分支门禁通过后，文档和运行状态才沉淀到 `<主服务仓库>/req/<feature-dir 的目录名>`；随后在该服务仓库内执行 MRD 澄清，并将其 `app-knowledge-base/` 作为交叉验证知识库。hash 目录保留为原始输入审计记录。
 
 ## 需求分支准备
+
+服务路由完成后，工作流会先返回 `post_service_router` 确认门。向用户展示该确认门和选项，要求其核对 `apps.json` 中的 `primary`、`collaborators`、`readOnly` 和 `repositories` 是否覆盖了正确的服务范围。不得自行跳过或确认；只有用户选择 `accept` 后并显式恢复运行，才会创建、切换或推送服务需求分支。用户选择 `revise` 时会重新执行服务路由。
 
 服务路由完成后、生成 PRD 前，工作流会为每个主改和协同服务准备分支。需求目录名必须为 `{版本号}_{需求编号}_{中文需求标题}`，例如 `2.1.10_98532_Engios平台接入应用`。工作流会执行 `git fetch origin --prune`，然后切换到或从 `origin/release` 创建 `fun_{版本号}_{需求编号}_{标题}_{Git 用户名}`；新建分支会通过 `git push -u origin` 发布。
 

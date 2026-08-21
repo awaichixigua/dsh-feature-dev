@@ -53,7 +53,7 @@ void test('resolve() with unknown id throws', () => {
 });
 
 void test('GATES registry has all expected gates', () => {
-  for (const k of ['post_locate', 'pre_test_spec', 'post_test_spec', 'pre_prd', 'pre_tech_design', 'pre_archive', 'pre_kb_update']) {
+  for (const k of ['post_locate', 'post_service_router', 'pre_test_spec', 'post_test_spec', 'pre_prd', 'pre_tech_design', 'pre_archive', 'pre_kb_update']) {
     assert.ok(GATES[k as keyof typeof GATES]);
   }
 });

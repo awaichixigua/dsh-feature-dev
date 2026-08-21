@@ -60,16 +60,16 @@ const CODE_GEN_TDD_EDGES: EdgeMap = {
 };
 
 const IMPLEMENTATION_PLAN_EDGES: EdgeMap = {
-  INITIALIZED: new Set(['MRD_READER', 'CLARIFY']),
-  MRD_READER: new Set(['CLARIFY', 'SERVICE_ROUTER', 'BLOCKED']),
-  CLARIFY: new Set(['SERVICE_ROUTER', 'BLOCKED']),
+  INITIALIZED: new Set(['MRD_READER']),
+  MRD_READER: new Set(['SERVICE_ROUTER', 'BLOCKED']),
   SERVICE_ROUTER: new Set(['BRANCH_GATE', 'BLOCKED']),
-  BRANCH_GATE: new Set(['PRD', 'BLOCKED']),
+  BRANCH_GATE: new Set(['CLARIFY', 'BLOCKED']),
+  CLARIFY: new Set(['PRD', 'BLOCKED']),
   PRD: new Set(['TECH_DESIGN', 'BLOCKED']),
   TECH_DESIGN: new Set(['COMPLETED', 'BLOCKED']),
   COMPLETED: new Set(),
   BLOCKED: new Set(),
-  INTERRUPTED: new Set(['MRD_READER', 'CLARIFY', 'SERVICE_ROUTER', 'BRANCH_GATE', 'PRD', 'TECH_DESIGN']),
+  INTERRUPTED: new Set(['MRD_READER', 'SERVICE_ROUTER', 'BRANCH_GATE', 'CLARIFY', 'PRD', 'TECH_DESIGN']),
 };
 
 const BUGFIX_EDGES: EdgeMap = {
@@ -211,7 +211,7 @@ export function nextPhaseFromResult(
     }
   }
   if (workflow === 'implementation-plan' || workflow === 'mrd-to-code') {
-    const order = ['INITIALIZED', 'MRD_READER', 'CLARIFY', 'SERVICE_ROUTER', 'BRANCH_GATE', 'PRD', 'TECH_DESIGN', 'COMPLETED'];
+    const order = ['INITIALIZED', 'MRD_READER', 'SERVICE_ROUTER', 'BRANCH_GATE', 'CLARIFY', 'PRD', 'TECH_DESIGN', 'COMPLETED'];
     const i = order.indexOf(currentPhase);
     if (i < 0 || i === order.length - 1) return 'BLOCKED';
     return order[i + 1]!;

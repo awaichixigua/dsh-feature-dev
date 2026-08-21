@@ -15,6 +15,7 @@ import type { StateRepository } from './state-repository.js';
 
 export type Gate =
   | 'post_locate'
+  | 'post_service_router'
   | 'pre_test_spec'
   | 'post_test_spec'
   | 'pre_tech_design'
@@ -36,6 +37,13 @@ export const GATES: Record<Gate, GateDef> = {
     id: 'post_locate',
     prompt: '请先确认 LOCATE 阶段的定位结论和建议修复方向，再修改代码或文档。',
     options: ['proceed', 'revise', 'abort'],
+    required: true,
+    blocking: true,
+  },
+  post_service_router: {
+    id: 'post_service_router',
+    prompt: '请确认 app-router 识别的服务范围是否正确。请核对 apps.json 中的 primary、collaborators、readOnly 和 repositories；确认后才会为可写服务创建或切换需求分支。',
+    options: ['accept', 'revise', 'abort'],
     required: true,
     blocking: true,
   },

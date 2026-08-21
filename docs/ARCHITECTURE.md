@@ -66,8 +66,10 @@ sequenceDiagram
 ```text
 INITIALIZED
   → MRD_READER        (mrd-reader)
-  → CLARIFY           (mrd-clarify)
   → SERVICE_ROUTER    (app-router)
+  → [post_service_router 确认门]
+  → BRANCH_GATE       (prepare service requirement branch)
+  → CLARIFY           (mrd-clarify, in primary service repository)
   → PRD               (prd-generator)
   → [pre_prd 确认门]
   → TECH_DESIGN       (tech-design)
@@ -75,7 +77,7 @@ INITIALIZED
   → COMPLETED
 ```
 
-它生成 `mrd-original.md`、`prd.md` 和 `tech-design.md`。其中 MRD、PRD 和技术方案被 runtime 强制校验；澄清和服务路由的具体规则由各自 agent 指令定义。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
+它生成 `mrd-original.md`、`prd.md` 和 `tech-design.md`。其中 MRD、PRD 和技术方案被 runtime 强制校验；澄清和服务路由的具体规则由各自 agent 指令定义。`post_service_router` 门在服务路由产出 `apps.json` 后触发，用户确认服务范围后才会准备服务需求分支。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
 
 ### code-gen-tdd
 
