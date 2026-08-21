@@ -19,6 +19,7 @@ import { GateEngine } from '../runtime/gate-engine.js';
 import { resolve } from 'node:path';
 import { runPhaseSubagent } from './subagent-runner.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
+import { prepareRequirementBranches } from './branch-gate.js';
 
 export async function implementationPlan(
   state: ExecutionState,
@@ -43,9 +44,27 @@ export async function implementationPlan(
     },
     {
       name: 'SERVICE_ROUTER',
-      artifacts: [],
+      artifacts: [{ path: `${featureDir}/apps.json`, minSize: 2, mustContain: ['repositories'] }],
       subagent: 'app-router',
       run: makeRunner('app-router'),
+    },
+    {
+      name: 'BRANCH_GATE',
+      artifacts: [],
+      run: async (_state, currentInv) => {
+        const outcome = prepareRequirementBranches({
+          projectRoot: currentInv.projectRoot,
+          featureDir: currentInv.featureDir ?? featureDir,
+        });
+        return {
+          status: outcome.ok ? 'pass' : 'block',
+          summary: outcome.summary,
+          artifacts: [],
+          evidence: outcome.evidence,
+          changedFiles: [],
+          ...(outcome.blocker ? { blocker: outcome.blocker } : {}),
+        };
+      },
     },
     {
       name: 'PRD',
