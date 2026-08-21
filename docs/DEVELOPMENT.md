@@ -78,9 +78,24 @@ pnpm test:package      # 验证 npm `files` 是否包含所有必需内容
 
 ## 新增子 agent
 
-1. 在 `agents/<agent-name>.md` 中按 `PhaseRequest` / `PhaseResult` 协议编写。
-2. 在对应的工作流中增加一个阶段调用。
-3. 如果 agent 的输出非平凡,针对其产出的 `parsePhaseResult` 场景补单元测试。
+子 agent 提示词按所属 workflow 分目录存放；被多个 workflow 共用的放 `agents/shared/`，由 `src/workflows/agent-prompt-path.ts` 的 `resolveAgentPromptPath(packageRoot, workflow, subagent)` 解析（先看 `agents/<workflow>/<subagent>.md`，缺则回落 `agents/shared/<subagent>.md`）。
+
+1. **写提示词**。在 `agents/<workflow>/<agent>.md`（或 `agents/shared/<agent>.md`）创建 Markdown：YAML frontmatter + 正文。
+   - frontmatter 必填：`name`、`phase`、`workflow`、`model_role`（`planning | coding | review | summary`）、`output`。`phase` 决定子会话的 `workflow:<w> | phase:<p>` 标签；`model_role` 决定执行器从 `opts.models` 里挑哪条模型路由，缺了就用 `defaultModel` 再落到 DSH 父路由。
+   - frontmatter 里的 `workflow` / `phase` 必须与第 2 步在 workflow 阶段表里登记的 id 一致。
+   - 正文按「输入 / 输出 / 必须章节 / 硬规则」组织。最终输出必须严格遵守 `PhaseResult` JSON 合约（`status` 枚举 `pass | warn | block | failed`、`summary`、`artifacts`、`evidence`、`changedFiles`、`blocker?`）；自然语言用简体中文，但 JSON 键名和 `status` 枚举保持原样。`evidence` 项必须是字符串；`pass` 但 `evidence` 为空会被 `parsePhaseResult` 自动降级为 `warn`。
+2. **接到 workflow 驱动**。在 `src/workflows/<workflow>.ts` 的阶段列表里加一个 `PhaseSpec`，把 `subagent` 字段填成提示词文件名（不含 `.md`）。`promptPath` 由 `resolveAgentPromptPath` 自动算出，无需手写。
+   - 如果 `phase` 是新阶段名（不只是复用现有阶段），还要在 `src/runtime/state-machine.ts` 加 FSM 边，并在 `src/workflows/artifacts.ts` 里登记阶段期望的产物。
+   - 全新 workflow 才需要动 `src/runtime/invocation.ts` 的 `KNOWN_WORKFLOWS`——那一节归「新增工作流」。
+3. **配套规则**。`src/executors/protocol.ts` 的 `buildRuleLoadingPolicy` 会在 prompt 里强制子 agent 先读 `rules/common/*.md`（缺失会抛 `ExecutorError`），再按需读 `rules/<agent>/index.md`。
+   - 有专属约束的 agent：在 `rules/<agent>/index.md` 列主题规则；index 缺失会跳过专属规则。
+   - 纯靠公共规则的 agent：至少确认 `rules/common/` 下已经有它需要的主题。
+4. **如果是 shared agent**（被 ≥ 2 个 workflow 复用），把它登记到 `agents/README.md` 的「shared 子 agent 的复用关系」表里；frontmatter 的 `workflow` 写成它首次出现的那个 workflow。
+5. **补测试**。
+   - `PhaseResult` 解析非平凡时（自定义 `bugClassification`、宽松 evidence 等），在 `tests/unit/` 给 `parsePhaseResult` 加场景。
+   - 参与 project-tools 流程的 agent 追加到 `tests/contract/project-tools-loading.test.ts` 的 `AGENTS` 白名单（该测试会校验 frontmatter / 正文里出现 `arch-docs/project-tools-index.md` 的引用与 `block` 行为）。
+   - 跑 `pnpm test:package` 确认 `agents/<新路径>` 被 `package.json` 的 `files` 包含。
+6. **更新文档**。在 `docs/TECH_DESIGN.md` 与 `docs/USER_GUIDE.md` 的相关章节里登记新阶段 / 新 agent。
 
 ## 与 DSH API 的兼容性
 
