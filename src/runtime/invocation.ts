@@ -24,6 +24,7 @@ const KNOWN_WORKFLOWS: ReadonlySet<WorkflowId> = new Set<WorkflowId>([
   'code-gen-tdd',
   'bugfix',
   'archive',
+  'prd-clarify',
   'influence-menu',
 ]);
 

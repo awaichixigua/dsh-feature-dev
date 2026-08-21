@@ -69,7 +69,7 @@ INITIALIZED
   → SERVICE_ROUTER    (app-router)
   → [post_service_router 确认门]
   → BRANCH_GATE       (prepare service requirement branch)
-  → CLARIFY           (mrd-clarify, in primary service repository)
+  → CLARIFY           (main-conversation action; no subagent)
   → PRD               (prd-generator)
   → [pre_prd 确认门]
   → TECH_DESIGN       (tech-design)
@@ -77,7 +77,7 @@ INITIALIZED
   → COMPLETED
 ```
 
-它生成 `mrd-original.md`、`prd.md` 和 `tech-design.md`。其中 MRD、PRD 和技术方案被 runtime 强制校验；澄清和服务路由的具体规则由各自 agent 指令定义。`post_service_router` 门在服务路由产出 `apps.json` 后触发，用户确认服务范围后才会准备服务需求分支。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
+它生成 `mrd-original.md`、`mrd-clarified.md`、`prd.md` 和 `tech-design.md`。其中 MRD 澄清由主会话完成：runtime 以 `pendingMainAction` 返回正式需求目录和输入/输出路径，主会话写入澄清文档后恢复，工作流只做本地校验并直接进入 PRD，不会启动澄清子代理。`post_service_router` 门在服务路由产出 `apps.json` 后触发，用户确认服务范围后才会准备服务需求分支。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
 
 ### code-gen-tdd
 
@@ -111,7 +111,7 @@ TEST_SPEC → 确认 → IMPLEMENTATION → REVIEW
 - `revise`：回退到创建该门禁的阶段，下一次恢复会重跑该阶段。
 - `abort`：结束本次运行。
 
-确认后通过 `feature_dev_resume` 继续。若阶段返回 `block` 或 `failed`，线性工作流会处于 `BLOCKED`，恢复时会重跑最近的失败阶段。运行状态位于 `<featureDir>/ai/execution-state.json`，同目录还有便于人工阅读的 `execution-state.md` 与审计日志。
+会话在用户完成非 `abort` 确认后应立即调用 `feature_dev_resume` 继续，不应要求用户再发一条 `/resume`。若状态包含 `pendingMainAction`，主会话应完成其中指定的文件操作，再使用工具最新返回的正式 `featureDir` 恢复。若普通阶段返回 `block` 或 `failed`，线性工作流会处于 `BLOCKED`，恢复时会重跑最近的失败阶段。运行状态位于 `<featureDir>/ai/execution-state.json`，同目录还有便于人工阅读的 `execution-state.md` 与审计日志。
 
 ## 关键约束
 

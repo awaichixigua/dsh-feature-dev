@@ -28,8 +28,11 @@ void test('missing required artifacts block a phase and do not raise its gate', 
       }
     );
     assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+    if (!result.ok) return;
 
-    const state = new StateRepository({ projectRoot: project, featureDir }).read();
+    // MRD URL runs start in a hash staging directory; always follow the
+    // authoritative path returned by the tool instead of guessing it.
+    const state = new StateRepository({ projectRoot: project, featureDir: result.data.featureDir }).read();
     assert.equal(state.status, 'blocked');
     assert.equal(state.currentPhase, 'BLOCKED');
     assert.equal(state.pendingConfirmations.length, 0);

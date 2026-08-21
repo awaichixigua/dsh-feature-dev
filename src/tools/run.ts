@@ -8,7 +8,7 @@ import { StateRepository } from '../runtime/state-repository.js';
 import { resolveMrdStagingDir, validateFeatureDir } from '../runtime/paths.js';
 import { basename } from 'node:path';
 import { DshCompatibilityError } from '../runtime/errors.js';
-import type { FeatureDevInvocation, PendingConfirmation, PhaseResult } from '../types/contracts.js';
+import type { FeatureDevInvocation, PendingConfirmation, PendingMainAction, PhaseResult } from '../types/contracts.js';
 import { runWorkflow } from '../workflows/runner.js';
 import { makeDshSubagentPort, makeNullSubagentPort } from '../executors/spawn-port.js';
 import { SubagentExecutor } from '../executors/protocol.js';
@@ -41,6 +41,7 @@ export interface RunOutput {
   featureDir: string;
   statePath: string;
   pendingConfirmations: PendingConfirmation[];
+  pendingMainAction?: PendingMainAction;
   lastPhaseResult?: PhaseResult;
 }
 
@@ -183,6 +184,7 @@ export async function runFeatureDev(
       featureDir: finalState.featureDir,
       statePath: runnerDeps.repo.statePath,
       pendingConfirmations: finalState.pendingConfirmations,
+      ...(finalState.pendingMainAction ? { pendingMainAction: finalState.pendingMainAction } : {}),
       ...(finalState.lastPhaseResult ? { lastPhaseResult: finalState.lastPhaseResult } : {}),
     });
   } catch (e) {

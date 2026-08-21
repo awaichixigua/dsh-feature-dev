@@ -20,7 +20,7 @@ agents/
 | `archive-report` | `code-gen-tdd` / `PHASE6_SUMMARY`；`archive` / `SNAPSHOT`、`REPORT` |
 | `bugfix-fix` | `bugfix` / `CODE_FIX`；`code-gen-tdd` / `PHASE2_REPAIR` |
 | `kb-update` | `archive` / `FRESHNESS_CHECK`、`KB_UPDATE`；`knowledge-base` 单次 workflow |
-| `mrd-clarify` | `implementation-plan` / `CLARIFY`；`prd-clarify` 单次 workflow |
+| `mrd-clarify` | `prd-clarify` 单次 workflow；`implementation-plan` 的澄清由主会话完成 |
 | `prd-generator` | `implementation-plan` / `PRD`；`bugfix` / `DOC_REVISION` |
 | `tdd-test-runner` | `code-gen-tdd` / `PHASE5_TEST_EXECUTION`；`bugfix` / `VERIFY` |
 

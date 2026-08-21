@@ -4,8 +4,9 @@
  * Phases: INITIALIZED -> MRD_READER -> SERVICE_ROUTER -> [service scope confirmation]
  * -> BRANCH_GATE -> CLARIFY -> PRD -> TECH_DESIGN -> COMPLETED
  *
- * Each phase runs a real Subagent via the `SubagentExecutor` injected
- * into `RunnerDeps`. PhaseRequest inputs carry the project context.
+ * Document-generation phases run real Subagents via the `SubagentExecutor`
+ * injected into `RunnerDeps`. MRD clarification is owned by the main
+ * conversation and is represented as a persisted pendingMainAction.
  */
 
 import type {
@@ -69,13 +70,13 @@ export async function implementationPlan(
       afterPass: (current, currentInv, currentDeps) => settleDocumentsIntoService(current, currentInv, currentDeps),
     },
     {
-      // Clarification intentionally runs only after routing and the branch
-      // gate have selected a concrete primary service repository. This gives
-      // the agent the service-owned MRD and knowledge-base path to cross-check.
+      // Clarification is deliberately not a subagent phase. A child session
+      // must never ask the user questions. The main conversation reads the
+      // routed MRD/knowledge base, conducts the dialogue, writes the artifact,
+      // then resumes this run; the local check passes straight into PRD.
       name: 'CLARIFY',
       artifacts: [],
-      subagent: 'mrd-clarify',
-      run: makeRunner('mrd-clarify'),
+      run: awaitMainConversationClarification,
     },
     {
       name: 'PRD',
@@ -175,9 +176,6 @@ function makeRunner(subagent: string) {
   return async (state: ExecutionState, inv: FeatureDevInvocation, deps: RunnerDeps): Promise<PhaseResult> => {
     const promptPath = resolveAgentPromptPath(deps.ctx.packageRoot, 'implementation-plan', subagent);
     const usesStagingOnly = isPreRoutingSubagent(subagent);
-    const kbLocalPath = subagent === 'mrd-clarify'
-      ? resolveServiceKnowledgeBase(inv.featureDir)
-      : undefined;
     const req: PhaseRequest = {
       runId: state.runId,
       workflow: 'implementation-plan',
@@ -191,13 +189,9 @@ function makeRunner(subagent: string) {
           featureId: inv.featureId,
         }),
         mrdUrl: inv.mrdUrl,
-        ...(subagent === 'mrd-clarify' || subagent === 'app-router'
+        ...(subagent === 'app-router'
           ? { mrdOriginalPath: resolve(inv.featureDir ?? inv.projectRoot, 'mrd-original.md') }
           : {}),
-        ...(kbLocalPath ? {
-          kb_local_path: kbLocalPath,
-          kbContextPath: join(kbLocalPath, 'CONTEXT.md'),
-        } : {}),
         options: inv.options,
         ...(subagent === 'prd-generator'
           ? { prdTemplatePath: resolve(deps.ctx.packageRoot, 'templates', 'prd-template.md') }
@@ -223,6 +217,45 @@ function makeRunner(subagent: string) {
         blocker: `请解决 ${subagent} 的子模型、提供方或运行时错误后再继续运行`,
       };
     }
+  };
+}
+
+async function awaitMainConversationClarification(
+  state: ExecutionState,
+  inv: FeatureDevInvocation,
+  _deps: RunnerDeps
+): Promise<PhaseResult> {
+  const featureDir = resolve(inv.featureDir ?? state.featureDir);
+  const mrdOriginalPath = resolve(featureDir, 'mrd-original.md');
+  const mrdClarifiedPath = resolve(featureDir, 'mrd-clarified.md');
+  const knowledgeBasePath = resolveServiceKnowledgeBase(featureDir);
+
+  if (existsSync(mrdClarifiedPath) && readFileSync(mrdClarifiedPath, 'utf8').trim().length > 0) {
+    delete state.pendingMainAction;
+    return {
+      status: 'pass',
+      summary: '主会话已完成 MRD 澄清，继续生成 PRD',
+      artifacts: [mrdClarifiedPath],
+      evidence: [`mrd_clarified:${mrdClarifiedPath}`],
+      changedFiles: [],
+    };
+  }
+
+  state.pendingMainAction = {
+    kind: 'clarify_mrd',
+    mode: inv.options.clarifyMode ?? 'dialogue',
+    mrdOriginalPath,
+    mrdClarifiedPath,
+    ...(knowledgeBasePath ? { knowledgeBasePath } : {}),
+    instruction: '由主会话读取 MRD 与可用知识库，向用户完成需求澄清并写入 mrd-clarified.md；写入后使用同一 projectRoot 和 featureDir 调用 feature_dev_resume。不要启动 mrd-clarify 子代理。',
+  };
+  return {
+    status: 'block',
+    summary: '等待主会话完成 MRD 澄清',
+    artifacts: [],
+    evidence: ['main_action:clarify_mrd'],
+    changedFiles: [],
+    blocker: `请由主会话完成澄清并写入 ${mrdClarifiedPath}，然后直接恢复工作流`,
   };
 }
 

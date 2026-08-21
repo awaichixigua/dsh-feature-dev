@@ -77,10 +77,10 @@ async function runUntilPrePrdGate(project: string) {
   // workflow's resume logic doesn't re-run them.
   state.phaseHistory.push(
     { phase: 'MRD_READER', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' },
-    { phase: 'CLARIFY', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' },
-    { phase: 'SERVICE_ROUTER', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' }
+    { phase: 'SERVICE_ROUTER', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' },
+    { phase: 'BRANCH_GATE', status: 'pass', startedAt: state.startedAt, endedAt: state.startedAt, summary: 'stub' }
   );
-  state.currentPhase = 'PRD';
+  state.currentPhase = 'BRANCH_GATE';
   state.updatedAt = new Date().toISOString();
   repo.writeAtomicPublic(state);
 

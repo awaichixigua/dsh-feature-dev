@@ -43,8 +43,9 @@ dsh --profile web --dump-config
 
 ```text
 /confirm --project-root . --feature-dir req/create-order --gate pre_prd --choice accept
-/resume  --project-root . --feature-dir req/create-order
 ```
+
+确认成功后，会话会自动调用恢复操作继续工作流；不需要用户再单独输入 `/resume`。
 
 不要跳过确认，也不要反复轮询。运行被中断或阻塞时，先解决提示中的原因，再显式恢复。
 

@@ -8,7 +8,7 @@ import { resolveProjectRoot, validateFeatureDir } from '../runtime/paths.js';
 import { NotFoundError } from '../runtime/errors.js';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { PendingConfirmation, PhaseResult } from '../types/contracts.js';
+import type { PendingConfirmation, PendingMainAction, PhaseResult } from '../types/contracts.js';
 
 export interface StatusArgs {
   projectRoot: string;
@@ -29,6 +29,8 @@ export interface StatusOutput {
   repairCount: number;
   pendingConfirmations: number;
   confirmations: PendingConfirmation[];
+  pendingMainAction?: PendingMainAction;
+  featureDir: string;
   statePath: string;
   lastPhaseResult?: PhaseResult;
   markdown?: string;
@@ -70,6 +72,8 @@ export async function statusFeatureDev(
       repairCount: state.repairCount,
       pendingConfirmations: state.pendingConfirmations.length,
       confirmations: state.pendingConfirmations,
+      ...(state.pendingMainAction ? { pendingMainAction: state.pendingMainAction } : {}),
+      featureDir: state.featureDir,
       statePath: repo.statePath,
       ...(state.lastPhaseResult ? { lastPhaseResult: state.lastPhaseResult } : {}),
       ...(markdown !== undefined ? { markdown } : {}),

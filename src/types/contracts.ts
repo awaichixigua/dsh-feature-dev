@@ -168,12 +168,23 @@ export interface ExecutionState {
   agentCount: number;
   /** Pending confirmation gates (user must respond). */
   pendingConfirmations: PendingConfirmation[];
+  /** Work that must be completed by the main conversation before resume. */
+  pendingMainAction?: PendingMainAction;
   /** Last PhaseResult for the current phase. */
   lastPhaseResult?: PhaseResult;
   /** Per-feature model role overrides. */
   modelOverrides?: Partial<Record<ModelRole, ModelRoute>>;
   /** Free-form notes (audit only; never read for state recovery). */
   notes?: string[];
+}
+
+export interface PendingMainAction {
+  kind: 'clarify_mrd';
+  mode: 'dialogue' | 'batch';
+  mrdOriginalPath: string;
+  mrdClarifiedPath: string;
+  knowledgeBasePath?: string;
+  instruction: string;
 }
 
 export interface PhaseHistoryEntry {

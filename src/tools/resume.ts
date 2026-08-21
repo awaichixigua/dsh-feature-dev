@@ -13,7 +13,7 @@ import { StateRepository, isTerminalStatus, rewindMostRecentFailure } from '../r
 import { resolveProjectRoot, validateFeatureDir } from '../runtime/paths.js';
 import { runWorkflow } from '../workflows/runner.js';
 import { ConflictError, DshCompatibilityError, NotFoundError } from '../runtime/errors.js';
-import type { FeatureDevInvocation, PendingConfirmation, PhaseResult, WorkflowId } from '../types/contracts.js';
+import type { FeatureDevInvocation, PendingConfirmation, PendingMainAction, PhaseResult, WorkflowId } from '../types/contracts.js';
 import { makeDshSubagentPort, makeNullSubagentPort } from '../executors/spawn-port.js';
 import { SubagentExecutor } from '../executors/protocol.js';
 import type { DshContext } from '../dsh/context.js';
@@ -40,7 +40,10 @@ export interface ResumeOutput {
   status: string;
   currentPhase: string;
   workflow: WorkflowId;
+  featureDir: string;
+  statePath: string;
   pendingConfirmations: PendingConfirmation[];
+  pendingMainAction?: PendingMainAction;
   lastPhaseResult?: PhaseResult;
 }
 
@@ -156,7 +159,10 @@ export async function resumeFeatureDev(
       status: final.status,
       currentPhase: final.currentPhase,
       workflow: final.workflow,
+      featureDir: final.featureDir,
+      statePath: new StateRepository({ projectRoot, featureDir: final.featureDir }).statePath,
       pendingConfirmations: final.pendingConfirmations,
+      ...(final.pendingMainAction ? { pendingMainAction: final.pendingMainAction } : {}),
       ...(final.lastPhaseResult ? { lastPhaseResult: final.lastPhaseResult } : {}),
     });
   } catch (e) {

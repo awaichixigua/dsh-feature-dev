@@ -68,6 +68,19 @@
     "repairCount": { "type": "integer", "minimum": 0 },
     "agentCount": { "type": "integer", "minimum": 0 },
     "pendingConfirmations": { "type": "array" },
+    "pendingMainAction": {
+      "type": "object",
+      "required": ["kind", "mode", "mrdOriginalPath", "mrdClarifiedPath", "instruction"],
+      "properties": {
+        "kind": { "type": "string", "const": "clarify_mrd" },
+        "mode": { "type": "string", "enum": ["dialogue", "batch"] },
+        "mrdOriginalPath": { "type": "string" },
+        "mrdClarifiedPath": { "type": "string" },
+        "knowledgeBasePath": { "type": "string" },
+        "instruction": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "lastPhaseResult": { "type": "object" },
     "modelOverrides": {
       "type": "object",

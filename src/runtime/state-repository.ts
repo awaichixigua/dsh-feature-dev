@@ -458,6 +458,18 @@ export class StateRepository {
     lines.push(`- **修复尝试次数**: ${state.repairCount} /（配置上限）`);
     lines.push(`- **已启动子代理数**: ${state.agentCount}`);
     lines.push('');
+    if (state.pendingMainAction) {
+      lines.push('## 主会话待办');
+      lines.push('');
+      lines.push(`- **类型**: \`${state.pendingMainAction.kind}\``);
+      lines.push(`- **说明**: ${state.pendingMainAction.instruction}`);
+      lines.push(`- **MRD 输入**: \`${state.pendingMainAction.mrdOriginalPath}\``);
+      lines.push(`- **澄清输出**: \`${state.pendingMainAction.mrdClarifiedPath}\``);
+      if (state.pendingMainAction.knowledgeBasePath) {
+        lines.push(`- **知识库**: \`${state.pendingMainAction.knowledgeBasePath}\``);
+      }
+      lines.push('');
+    }
     if (state.lastPhaseResult) {
       lines.push('## 最近阶段结果');
       lines.push('');
