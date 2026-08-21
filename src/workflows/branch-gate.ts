@@ -9,6 +9,12 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import {
+  defaultRepoPathProbe,
+  findDirectGitReposUnder,
+  looksLikeGitRepository,
+  type RepoPathProbe,
+} from '../runtime/paths.js';
 
 export interface GitClient {
   run(cwd: string, args: string[]): string;
@@ -89,10 +95,11 @@ export function requirementBranchName(featureDir: string, userName: string): str
  */
 export function prepareRequirementBranches(
   input: BranchGateInput,
-  git: GitClient = systemGit
+  git: GitClient = systemGit,
+  probe: RepoPathProbe = defaultRepoPathProbe
 ): BranchGateOutcome {
   try {
-    const repositories = readWritableRepositories(input);
+    const repositories = readWritableRepositories(input, probe);
     const evidence: string[] = [];
     for (const [service, repo] of repositories) {
       const gitRoot = git.run(repo, ['rev-parse', '--show-toplevel']);
@@ -137,7 +144,10 @@ export function prepareRequirementBranches(
   }
 }
 
-function readWritableRepositories(input: BranchGateInput): Array<[string, string]> {
+function readWritableRepositories(
+  input: BranchGateInput,
+  probe: RepoPathProbe = defaultRepoPathProbe
+): Array<[string, string]> {
   const appsPath = resolve(input.featureDir, 'apps.json');
   if (!existsSync(appsPath)) throw new Error(`缺少服务路由结果：${appsPath}`);
   let apps: AppsFile;
@@ -155,17 +165,57 @@ function readWritableRepositories(input: BranchGateInput): Array<[string, string
     throw new Error('apps.json 必须提供 repositories：服务名到服务仓库路径的映射');
   }
   const locations = apps.repositories as Record<string, unknown>;
-  return services.map((service) => {
+  const problems: string[] = [];
+  const pairs: Array<[string, string]> = [];
+  for (const service of services) {
     const location = locations[service];
     if (typeof location !== 'string' || !location.trim()) {
-      throw new Error(`apps.json 缺少服务 ${service} 的仓库路径`);
+      problems.push(`apps.json 缺少服务 ${service} 的仓库路径`);
+      continue;
     }
     const repo = isAbsolute(location) ? resolve(location) : resolve(input.projectRoot, location);
     if (!isInside(repo, input.projectRoot)) {
-      throw new Error(`服务 ${service} 的仓库路径超出 projectRoot：${repo}`);
+      problems.push(`服务 ${service} 的仓库路径 ${repo} 超出 projectRoot ${input.projectRoot}`);
+      continue;
     }
-    return [service, repo];
-  });
+    if (!probe.exists(repo)) {
+      problems.push(`服务 ${service} 的仓库路径 ${repo} 不存在`);
+      continue;
+    }
+    if (!looksLikeGitRepository(repo, probe)) {
+      const hint = buildRepoHint(repo, input.projectRoot, probe);
+      problems.push(`服务 ${service} 的仓库路径 ${repo} 不是 git 仓库${hint}`);
+      continue;
+    }
+    pairs.push([service, repo]);
+  }
+  if (problems.length > 0) {
+    throw new Error(`apps.json 仓库路径预检未通过：\n  - ${problems.join('\n  - ')}`);
+  }
+  return pairs;
+}
+
+/**
+ * Build a human-friendly hint when apps.json points at a directory that is
+ * not a git repository. The most common mistake in monorepos is writing the
+ * monorepo root (which has no `.git` of its own) into `repositories.<svc>`;
+ * surface that explicitly and list the git repositories that DO live under
+ * the project root.
+ */
+function buildRepoHint(
+  repo: string,
+  projectRoot: string,
+  probe: RepoPathProbe
+): string {
+  const isMonorepoRoot = resolve(repo) === resolve(projectRoot);
+  const siblings = findDirectGitReposUnder(projectRoot, probe);
+  const siblingHint =
+    siblings.length === 0
+      ? ''
+      : `。projectRoot ${projectRoot} 下检测到的 git 仓库有：${siblings.join('、')}`;
+  return isMonorepoRoot
+    ? `——该路径就是 projectRoot 本身，monorepo 通常会把每个服务的 git 仓库放在子目录里，请改填例如 ${resolve(projectRoot, siblings[0] ?? '<service>')}`
+    : siblingHint || '，该目录下没有 .git 标记';
 }
 
 function asStringList(value: unknown, field: string): string[] {

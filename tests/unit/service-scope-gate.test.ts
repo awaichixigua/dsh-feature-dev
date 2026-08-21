@@ -32,6 +32,8 @@ void test('service routing pauses for scope confirmation before branch preparati
 
   try {
     mkdirSync(join(featureDir, 'ai'), { recursive: true });
+    mkdirSync(join(projectRoot, 'services', 'orders', '.git'), { recursive: true });
+    mkdirSync(join(projectRoot, 'services', 'billing', '.git'), { recursive: true });
     writeFileSync(join(featureDir, 'apps.json'), JSON.stringify({
       primary: ['orders'], collaborators: ['billing'], readOnly: ['catalog'],
       repositories: { orders: 'services/orders', billing: 'services/billing' },

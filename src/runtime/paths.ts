@@ -16,7 +16,7 @@
 
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, resolve, sep, isAbsolute } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { ExecutorError, ForbiddenError, NotFoundError, ValidationError } from './errors.js';
@@ -173,4 +173,52 @@ export function hasProjectMarker(dir: string): boolean {
     if (existsSync(resolve(dir, m))) return true;
   }
   return false;
+}
+
+/**
+ * Filesystem probe for the apps.json repository preflight. Splitting this
+ * out lets tests inject a deterministic probe without touching the real
+ * filesystem, and lets the SERVICE_ROUTER and BRANCH_GATE phases share
+ * the same "is this path really a git repository?" check.
+ */
+export interface RepoPathProbe {
+  exists(path: string): boolean;
+  isGitRepository(path: string): boolean;
+  listGitReposUnder(root: string): string[];
+}
+
+export const defaultRepoPathProbe: RepoPathProbe = {
+  exists: (p) => existsSync(p),
+  isGitRepository: (p) => existsSync(resolve(p, '.git')),
+  listGitReposUnder: (root) => {
+    if (!existsSync(root)) return [];
+    const out: string[] = [];
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.')) continue;
+      const child = resolve(root, entry.name);
+      if (existsSync(resolve(child, '.git'))) out.push(entry.name);
+    }
+    return out.sort();
+  },
+};
+
+/** Lightweight check: does the path look like a git repository toplevel? */
+export function looksLikeGitRepository(
+  path: string,
+  probe: RepoPathProbe = defaultRepoPathProbe
+): boolean {
+  return probe.exists(path) && probe.isGitRepository(path);
+}
+
+/**
+ * Direct git repositories that live one level under `root`. Used to build
+ * "the path you wrote is the monorepo root, but the git repositories are
+ * here" hints when apps.json misroutes a service.
+ */
+export function findDirectGitReposUnder(
+  root: string,
+  probe: RepoPathProbe = defaultRepoPathProbe
+): string[] {
+  return probe.listGitReposUnder(root);
 }

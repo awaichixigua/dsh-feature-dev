@@ -22,6 +22,7 @@ import { basename, isAbsolute, join, resolve } from 'node:path';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { StateRepository } from '../runtime/state-repository.js';
 import { isInside } from '../runtime/paths.js';
+import { defaultRepoPathProbe, findDirectGitReposUnder, looksLikeGitRepository, type RepoPathProbe } from '../runtime/paths.js';
 import { runPhaseSubagent } from './subagent-runner.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { prepareRequirementBranches } from './branch-gate.js';
@@ -237,7 +238,7 @@ async function runServiceRouter(
   const appsPath = resolve(featureDir, 'apps.json');
   const mrdOriginalPath = resolve(featureDir, 'mrd-original.md');
   const pending = state.pendingMainAction;
-  const existing = inspectServiceRoute(appsPath);
+  const existing = inspectServiceRoute(appsPath, inv.projectRoot);
 
   // A resumed main-conversation answer is authoritative. Do not spawn
   // app-router again and overwrite the user-confirmed service scope.
@@ -262,7 +263,7 @@ async function runServiceRouter(
   if (result.status === 'failed' && result.evidence.some((item) => item.startsWith('subagent_failure:'))) {
     return result;
   }
-  const inspected = inspectServiceRoute(appsPath);
+  const inspected = inspectServiceRoute(appsPath, inv.projectRoot);
   // A router-side block carries unresolved semantics even when its partial
   // apps.json happens to be structurally complete. Surface it to the main
   // conversation instead of losing the user's input opportunity.
@@ -301,7 +302,11 @@ interface ServiceRouteInspection {
   snapshot?: Record<string, unknown>;
 }
 
-function inspectServiceRoute(appsPath: string): ServiceRouteInspection {
+function inspectServiceRoute(
+  appsPath: string,
+  projectRoot?: string,
+  probe: RepoPathProbe = defaultRepoPathProbe
+): ServiceRouteInspection {
   if (!existsSync(appsPath)) return { ok: false, problems: ['apps.json 不存在'] };
   let value: unknown;
   try {
@@ -320,6 +325,28 @@ function inspectServiceRoute(appsPath: string): ServiceRouteInspection {
   const repositories = snapshot.repositories;
   if (!repositories || typeof repositories !== 'object' || Array.isArray(repositories)) {
     problems.push('repositories 必须提供主改和协同服务的仓库路径');
+  } else if (projectRoot) {
+    const projectRootAbs = resolve(projectRoot);
+    for (const service of [...new Set([...primary.names, ...collaborators.names])]) {
+      const location = (repositories as Record<string, unknown>)[service];
+      if (typeof location !== 'string' || !location.trim()) {
+        problems.push(`repositories.${service} 缺少仓库路径`);
+        continue;
+      }
+      const repoAbs = isAbsolute(location) ? resolve(location) : resolve(projectRootAbs, location);
+      if (!isInside(repoAbs, projectRootAbs)) {
+        problems.push(`repositories.${service} 路径 ${repoAbs} 超出 projectRoot ${projectRootAbs}`);
+        continue;
+      }
+      if (!probe.exists(repoAbs)) {
+        problems.push(`repositories.${service} 路径 ${repoAbs} 不存在`);
+        continue;
+      }
+      if (!looksLikeGitRepository(repoAbs, probe)) {
+        const hint = buildServiceRouteHint(repoAbs, projectRootAbs, probe);
+        problems.push(`repositories.${service} 路径 ${repoAbs} 不是 git 仓库${hint}`);
+      }
+    }
   } else {
     for (const service of [...new Set([...primary.names, ...collaborators.names])]) {
       const path = (repositories as Record<string, unknown>)[service];
@@ -329,6 +356,23 @@ function inspectServiceRoute(appsPath: string): ServiceRouteInspection {
     }
   }
   return { ok: problems.length === 0, problems, snapshot };
+}
+
+/**
+ * Build a human-friendly hint when apps.json points at a directory that is
+ * not a git repository. Mirrors `buildRepoHint` in branch-gate.ts so the
+ * SERVICE_ROUTER and BRANCH_GATE phases give the user the same message.
+ */
+function buildServiceRouteHint(repo: string, projectRoot: string, probe: RepoPathProbe): string {
+  const isMonorepoRoot = resolve(repo) === resolve(projectRoot);
+  const siblings = findDirectGitReposUnder(projectRoot, probe);
+  const siblingHint =
+    siblings.length === 0
+      ? ''
+      : `。projectRoot ${projectRoot} 下检测到的 git 仓库有：${siblings.join('、')}`;
+  return isMonorepoRoot
+    ? `——该路径就是 projectRoot 本身，monorepo 通常会把每个服务的 git 仓库放在子目录里，请改填例如 ${resolve(projectRoot, siblings[0] ?? '<service>')}`
+    : siblingHint || '，该目录下没有 .git 标记';
 }
 
 function serviceNames(value: unknown, field: string): { names: string[]; problems: string[] } {

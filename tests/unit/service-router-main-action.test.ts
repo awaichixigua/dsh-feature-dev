@@ -40,7 +40,7 @@ void test('an unresolved app-router result becomes a main-conversation service c
 
   try {
     mkdirSync(join(featureDir, 'ai'), { recursive: true });
-    mkdirSync(join(projectRoot, 'services', 'engi-common'), { recursive: true });
+    mkdirSync(join(projectRoot, 'services', 'engi-common', '.git'), { recursive: true });
     writeFileSync(join(featureDir, 'mrd-original.md'), '# MRD\n\n基础库替换\n', 'utf8');
     const repo = new StateRepository({ projectRoot, featureDir });
     const state = repo.create({ workflow: 'implementation-plan', projectRoot, featureDir, featureId: '2.0.0_103111_fastjson替换为jackson' });

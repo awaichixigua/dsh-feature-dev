@@ -33,6 +33,7 @@ void test('branch gate creates and publishes a missing remote branch', () => {
   const featureDir = join(root, 'req', '2.1.10_98532_订单创建');
   rmSync(root, { recursive: true, force: true });
   mkdirSync(featureDir, { recursive: true });
+  mkdirSync(join(root, 'services', 'orders', '.git'), { recursive: true });
   writeFileSync(join(featureDir, 'apps.json'), JSON.stringify({
     primary: ['orders'], collaborators: [], repositories: { orders: 'services/orders' },
   }));
@@ -66,6 +67,7 @@ void test('branch gate fast-forwards an existing remote requirement branch', () 
   const featureDir = join(root, 'req', '2.1.10_98532_订单创建');
   rmSync(root, { recursive: true, force: true });
   mkdirSync(featureDir, { recursive: true });
+  mkdirSync(join(root, 'services', 'orders', '.git'), { recursive: true });
   writeFileSync(join(featureDir, 'apps.json'), JSON.stringify({
     primary: ['orders'], collaborators: [], repositories: { orders: 'services/orders' },
   }));
@@ -92,4 +94,83 @@ void test('branch gate fast-forwards an existing remote requirement branch', () 
   assert.ok(commands.some((command) => command.endsWith('|merge --ff-only origin/fun_2.1.10_98532_订单创建_张三')));
   assert.equal(commands.some((command) => command.includes('|push -u origin')), false);
   rmSync(root, { recursive: true, force: true });
+});
+
+void test('branch gate preflight: monorepo root path is reported as actionable hint', () => {
+  const root = join(process.cwd(), '.tmp-branch-gate-preflight-monorepo');
+  const featureDir = join(root, 'req', '2.0.0_103111_fastjson替换为jackson');
+  const engiCommon = join(root, 'engi-common');
+  rmSync(root, { recursive: true, force: true });
+  mkdirSync(featureDir, { recursive: true });
+  // projectRoot itself has no .git (monorepo); engi-common is the real git repo.
+  mkdirSync(join(engiCommon, '.git'), { recursive: true });
+  writeFileSync(join(featureDir, 'apps.json'), JSON.stringify({
+    primary: ['engi-common'], collaborators: [], repositories: { 'engi-common': '.' },
+  }));
+
+  const commands: string[] = [];
+  const git: GitClient = {
+    run(cwd, args) {
+      commands.push(`${cwd}|${args.join(' ')}`);
+      return cwd;
+    },
+    succeeds() { return true; },
+  };
+
+  try {
+    const result = prepareRequirementBranches({ projectRoot: root, featureDir }, git);
+    assert.equal(result.ok, false);
+    assert.match(result.blocker ?? '', /apps\.json 仓库路径预检未通过/);
+    assert.match(result.blocker ?? '', /projectRoot 本身/);
+    assert.match(result.blocker ?? '', /engi-common/);
+    // Must not have run any git command — the preflight blocks before we
+    // touch the repository.
+    assert.equal(commands.length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+void test('branch gate preflight: nonexistent path is reported with the resolved absolute path', () => {
+  const root = join(process.cwd(), '.tmp-branch-gate-preflight-missing');
+  const featureDir = join(root, 'req', '2.0.0_103111_fastjson替换为jackson');
+  rmSync(root, { recursive: true, force: true });
+  mkdirSync(featureDir, { recursive: true });
+  writeFileSync(join(featureDir, 'apps.json'), JSON.stringify({
+    primary: ['engi-common'], collaborators: [], repositories: { 'engi-common': 'services/engi-common' },
+  }));
+
+  try {
+    const result = prepareRequirementBranches({ projectRoot: root, featureDir });
+    assert.equal(result.ok, false);
+    assert.match(result.blocker ?? '', /不存在/);
+    assert.match(result.blocker ?? '', /services[\\/]engi-common/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+void test('branch gate preflight: directory without .git is reported with sibling git repo hint', () => {
+  const root = join(process.cwd(), '.tmp-branch-gate-preflight-nongit');
+  const featureDir = join(root, 'req', '2.0.0_103111_fastjson替换为jackson');
+  const engiCommon = join(root, 'engi-common');
+  const someDir = join(root, 'engi-json-starter');
+  rmSync(root, { recursive: true, force: true });
+  mkdirSync(featureDir, { recursive: true });
+  // engi-common is a real git repo; engi-json-starter is a plain directory
+  // (no .git), simulating an LLM that picked the wrong sibling.
+  mkdirSync(join(engiCommon, '.git'), { recursive: true });
+  mkdirSync(someDir, { recursive: true });
+  writeFileSync(join(featureDir, 'apps.json'), JSON.stringify({
+    primary: ['engi-common'], collaborators: [], repositories: { 'engi-common': 'engi-json-starter' },
+  }));
+
+  try {
+    const result = prepareRequirementBranches({ projectRoot: root, featureDir });
+    assert.equal(result.ok, false);
+    assert.match(result.blocker ?? '', /不是 git 仓库/);
+    assert.match(result.blocker ?? '', /engi-common/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
