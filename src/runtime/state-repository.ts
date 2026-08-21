@@ -423,6 +423,11 @@ export class StateRepository {
     this.writeAtomic(state);
   }
 
+  /** Rebuild the human-readable state projection after a repository move. */
+  regenerateMarkdownPublic(state: ExecutionState): void {
+    this.regenerateMarkdown(state);
+  }
+
   // ---- internals ---------------------------------------------------------
 
   private writeAtomic(state: ExecutionState): void {

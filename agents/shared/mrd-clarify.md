@@ -8,6 +8,8 @@ output: mrd-clarified.md
 
 # Agent: mrd-clarify
 
+Before service routing, use only `stagingFeatureDir`; no formal `featureDir` exists yet. Read `mrdOriginalPath` from staging and write any clarification artifact to the same staging directory.
+
 驱动澄清对话（或批量澄清）。**模型不替用户做决定**——只负责提问、接收、落盘。
 
 ## 模式

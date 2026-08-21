@@ -8,6 +8,8 @@ output: apps.json
 
 # Agent: app-router
 
+Before service routing, `stagingFeatureDir` is the only writable document directory. Do not infer, create, or receive a formal `featureDir`; write `apps.json` only to `<stagingFeatureDir>/apps.json`. Formal service requirement directories are created after the branch gate by the parent workflow.
+
 ## 需求分支交接
 
 将路由结果写入 `<featureDir>/apps.json`。除现有服务分类外，JSON **必须**包含 `repositories` 对象，为每个 `primary` 和 `collaborators` 服务映射其 Git 仓库路径。路径可以是绝对路径，也可以相对于 `projectRoot`；不得包含只读服务。示例：

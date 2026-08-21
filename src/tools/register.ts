@@ -221,14 +221,14 @@ async function runTool(
   try {
     const r = await fn(ctx);
     if (r.ok) {
-      return { ok: true, data: r.data as JsonValue };
+      return { ok: true, data: toLosslessJson(r.data) };
     }
     return {
       ok: false,
       error: {
         code: r.error.code,
         message: r.error.message,
-        ...(r.error.details !== undefined ? { details: r.error.details as JsonValue } : {}),
+        ...(r.error.details !== undefined ? { details: toLosslessJson(r.error.details) } : {}),
       },
     };
   } catch (e) {
@@ -238,7 +238,7 @@ async function runTool(
         error: {
           code: e.code,
           message: e.message,
-          ...(e.details !== undefined ? { details: e.details as JsonValue } : {}),
+          ...(e.details !== undefined ? { details: toLosslessJson(e.details) } : {}),
         },
       };
     }
@@ -250,6 +250,18 @@ async function runTool(
       },
     };
   }
+}
+
+/**
+ * DSH validates tool output as *lossless* JSON, which is stricter than
+ * JSON.stringify: an object with an own `undefined` property is rejected.
+ * Internal contracts intentionally use optional fields, so snapshot every
+ * externally visible payload to a detached JSON value at this boundary.
+ */
+function toLosslessJson(value: unknown): JsonValue {
+  const text = JSON.stringify(value);
+  if (text === undefined) return null;
+  return JSON.parse(text) as JsonValue;
 }
 
 function toolCtxFrom(

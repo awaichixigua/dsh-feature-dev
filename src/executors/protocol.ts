@@ -162,9 +162,8 @@ function buildPrompt(req: PhaseRequest, instructions: string): ContentBlock[] {
   context.push('  { "status": "pass" | "warn" | "block" | "failed",');
   context.push('    "summary": "面向用户的简体中文摘要",');
   context.push('    "artifacts": ["已创建文件的路径"],');
-  context.push('    "evidence": ["验证证据；说明文字使用简体中文"],');
-  context.push('    "changedFiles": ["已修改文件"],');
   context.push('    "blocker"?: "status=block|failed 时必填，使用简体中文" }');
+  context.push('不要在 structured_output 中传递 evidence 或 changedFiles；父工作流会将缺省值规范化为空数组。');
   context.push('');
   const prompt: ContentBlock[] = [
     { type: 'text', text: languagePolicy },
@@ -277,13 +276,11 @@ function phaseResultOutputSchema(): unknown {
       status: { type: 'string', enum: ['pass', 'warn', 'block', 'failed'] },
       summary: { type: 'string' },
       artifacts: { type: 'array', items: { type: 'string' } },
-      // Keep structured capture tolerant of a malformed child response.
-      // parsePhaseResult() below normalizes list values to strings and fills
-      // absent optional lists. A strict schema here makes DSH reject the
-      // complete child turn before we can preserve its code changes or show a
-      // useful contract warning to the parent.
-      evidence: { type: 'array', items: {} },
-      changedFiles: { type: 'array', items: {} },
+      // DSH's current structured-output bridge rejects these otherwise
+      // optional string-list fields for some providers. They are runtime
+      // metadata, not child-output requirements: parsePhaseResult() fills
+      // absent values with [] and the parent can infer evidence from artifacts.
+      // Keep them out of the schema so a valid child result is never lost.
       blocker: { type: 'string' },
       metrics: { type: 'object', additionalProperties: true },
       bugClassification: { type: 'string', enum: ['code_defect', 'business_requirement'] },

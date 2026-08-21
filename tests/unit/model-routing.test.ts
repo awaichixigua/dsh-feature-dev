@@ -90,6 +90,33 @@ void test('SubagentExecutor omits agentOptions so DSH inherits the parent model'
   }
 });
 
+void test('SubagentExecutor does not require optional metadata arrays in structured output', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-output-schema-'));
+  try {
+    const promptPath = join(dir, 'reader.md');
+    writeFileSync(promptPath, '---\nname: reader\nmodel_role: planning\n---\nRead carefully.\n');
+    let captured: SubagentInvokeArgs | undefined;
+    const port: SubagentPort = {
+      async invoke(args) {
+        captured = args;
+        return { rawText: '', result: { status: 'warn', summary: '完成', artifacts: [], evidence: [], changedFiles: [] } };
+      },
+    };
+    const executor = new SubagentExecutor(port, { provider: 'spawn', parent: {} as Agent });
+    await executor.run({
+      runId: 'run', workflow: 'implementation-plan', phase: 'MRD_READER', projectRoot: dir,
+      promptPath, inputs: {}, expectedArtifacts: [], mode: 'normal',
+    });
+
+    const schema = captured?.outputSchema as { properties?: Record<string, unknown> } | undefined;
+    assert.ok(schema?.properties?.status);
+    assert.equal(schema?.properties?.evidence, undefined);
+    assert.equal(schema?.properties?.changedFiles, undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 void test('SubagentExecutor places the Chinese language policy before agent instructions', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-language-policy-'));
   try {

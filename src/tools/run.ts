@@ -5,7 +5,8 @@
 import { shape, ok, fail, type ToolContext, type ToolResult } from './contract.js';
 import { normalizeInvocation, KNOWN_WORKFLOWS } from '../runtime/invocation.js';
 import { StateRepository } from '../runtime/state-repository.js';
-import { validateFeatureDir } from '../runtime/paths.js';
+import { resolveMrdStagingDir, validateFeatureDir } from '../runtime/paths.js';
+import { basename } from 'node:path';
 import { DshCompatibilityError } from '../runtime/errors.js';
 import type { FeatureDevInvocation, PendingConfirmation, PhaseResult } from '../types/contracts.js';
 import { runWorkflow } from '../workflows/runner.js';
@@ -73,6 +74,16 @@ export async function runFeatureDev(
     }
     if (!KNOWN_WORKFLOWS.has(inv.workflow)) {
       throw new Error(`Unknown workflow: ${inv.workflow}`);
+    }
+    // Keep the legacy document lifecycle: URL content first goes to a
+    // deterministic hash directory.  SERVICE_ROUTER and BRANCH_GATE later
+    // settle it into <service-repo>/req/<feature-name>.
+    if ((inv.workflow === 'implementation-plan' || inv.workflow === 'mrd-to-code') && inv.mrdUrl) {
+      if (!inv.featureDir) {
+        throw new Error('implementation-plan requires featureDir so the routed service requirement directory can be named');
+      }
+      inv.featureId ??= basename(inv.featureDir);
+      inv.featureDir = resolveMrdStagingDir(inv.projectRoot, inv.mrdUrl);
     }
     const repo = new StateRepository({
       projectRoot: inv.projectRoot,
@@ -143,7 +154,7 @@ export async function runFeatureDev(
     });
     // Run Start: kicks the reporter's baseline snapshot + requirement_id.
     lifecycle.onRunStart(state, inv);
-    let finalState = await runWorkflow(state, inv, {
+    const runnerDeps = {
       ctx,
       repo,
       created,
@@ -151,7 +162,8 @@ export async function runFeatureDev(
       config,
       spawnBudget,
       lifecycle,
-    });
+    };
+    let finalState = await runWorkflow(state, inv, runnerDeps);
     // Defensive backstop for legacy/adapter paths: a bugfix with a blocking
     // last phase result must never be reported as completed.
     if (inv.workflow === 'bugfix' && finalState.status === 'completed'
@@ -169,7 +181,7 @@ export async function runFeatureDev(
       status: finalState.status,
       currentPhase: finalState.currentPhase,
       featureDir: finalState.featureDir,
-      statePath: repo.statePath,
+      statePath: runnerDeps.repo.statePath,
       pendingConfirmations: finalState.pendingConfirmations,
       ...(finalState.lastPhaseResult ? { lastPhaseResult: finalState.lastPhaseResult } : {}),
     });

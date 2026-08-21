@@ -22,3 +22,10 @@ void test('planning and code-generation agents load matched project tool details
     assert.match(instructions, /返回 `block`|停止实现并返回 `block`/, `${agent} must block on an unreadable matched detail`);
   }
 });
+
+void test('prd-generator restricts its reads to declared PRD inputs and package rules', () => {
+  const instructions = readFileSync(resolve(ROOT, 'agents/shared/prd-generator.md'), 'utf8');
+  assert.match(instructions, /不得为补充上下文而扫描项目目录/);
+  assert.match(instructions, /`CLAUDE\.md`、`AGENT\.md`、`AGENTS\.md`/);
+  assert.match(instructions, /`mrdClarifiedPath`、`appsJsonPath`、`prdTemplatePath`/);
+});

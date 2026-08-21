@@ -18,6 +18,8 @@ export interface GitClient {
 export interface BranchGateInput {
   projectRoot: string;
   featureDir: string;
+  /** Requirement folder name when the MRD is still in URL-hash staging. */
+  featureName?: string;
 }
 
 export interface BranchGateOutcome {
@@ -98,7 +100,8 @@ export function prepareRequirementBranches(
         throw new Error(`服务 ${service} 的仓库路径必须指向 Git 顶层目录：${repo}`);
       }
       const userName = git.run(repo, ['config', 'user.name']);
-      const branch = requirementBranchName(input.featureDir, userName);
+      const featureDir = input.featureName ? resolve(repo, 'req', input.featureName) : input.featureDir;
+      const branch = requirementBranchName(featureDir, userName);
 
       git.run(repo, ['fetch', 'origin', '--prune']);
       if (!git.succeeds(repo, ['show-ref', '--verify', '--quiet', 'refs/remotes/origin/release'])) {
@@ -108,7 +111,7 @@ export function prepareRequirementBranches(
       const hasRemote = git.succeeds(repo, ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`]);
 
       const changes = git.run(repo, ['status', '--porcelain']);
-      if (hasUnsafeWorktreeChanges(changes, repo, input.featureDir)) {
+      if (hasUnsafeWorktreeChanges(changes, repo, featureDir)) {
         throw new Error(`服务 ${service} 工作区存在未提交修改，不能切换到需求分支`);
       }
       if (hasRemote) {

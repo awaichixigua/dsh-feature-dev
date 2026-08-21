@@ -3,10 +3,12 @@ name: implementation-plan
 description: 从 MRD 生成 PRD 和技术方案；仅产出文档，不生成业务代码。触发词：生成 PRD、生成技术方案、生成实施方案。
 user-invocable: true
 disable-model-invocation: false
-argument-hint: <MRD URL> --feature-dir <path> [--clarify-mode=dialogue|batch]
+argument-hint: <MRD URL> --feature-dir <需求目录名> [--clarify-mode=dialogue|batch]
 ---
 
 # implementation-plan
+
+MRD URL 会先抓取到 `<projectRoot>/.tmp/mrdoc-<sha256(url)[:12]>`。服务路由和需求分支门禁通过后，文档和运行状态才沉淀到 `<主服务仓库>/req/<feature-dir 的目录名>`；hash 目录保留为原始输入审计记录。
 
 ## 需求分支准备
 

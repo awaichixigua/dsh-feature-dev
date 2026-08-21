@@ -26,6 +26,11 @@ import { oneShot } from './one-shot.js';
 
 export interface RunnerDeps {
   ctx: ToolContext;
+  /**
+   * The implementation-plan flow starts in an MRD hash staging directory and
+   * switches this repository to the routed service requirement directory
+   * after its branch gate passes.
+   */
   repo: StateRepository;
   created: boolean;
   /** Configured subagent executor. Required for workflows that spawn agents. */

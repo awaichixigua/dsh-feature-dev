@@ -30,6 +30,8 @@ export interface PhaseSpec {
   /** Skip this phase without changing state. Used for conditional branches. */
   shouldSkip?: (state: ExecutionState) => boolean;
   run: (s: ExecutionState, inv: FeatureDevInvocation, deps: RunnerDeps) => Promise<PhaseResult>;
+  /** Runs after a successful phase has been persisted. */
+  afterPass?: (s: ExecutionState, inv: FeatureDevInvocation, deps: RunnerDeps) => Promise<void> | void;
 }
 
 export async function drivePhases(
@@ -102,8 +104,16 @@ export async function drivePhases(
     deps.repo.endPhase(state, target, result);
     deps.lifecycle?.onPhaseEnd(state, target, result);
 
+    if ((result.status === 'pass' || result.status === 'warn') && phase.afterPass) {
+      await phase.afterPass(state, inv, deps);
+    }
+
     if (phase.gate && result.status !== 'block' && result.status !== 'failed') {
-      const conf = engine.raise(state, phase.gate);
+      // deps.repo may be switched by a successful phase (the implementation
+      // plan moves from URL-hash staging to its routed service directory), so
+      // bind the gate to the current repository rather than the one captured
+      // when the workflow started.
+      const conf = new GateEngine(deps.repo, deps.config.strictGates).raise(state, phase.gate);
       state.notes = (state.notes ?? []).concat(`Gate ${phase.gate} raised: ${conf.id}`);
       return state;
     }

@@ -8,6 +8,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
+  resolveMrdStagingDir,
   resolvePackageRoot,
   resolveProjectRoot,
   validateFeatureDir,
@@ -123,4 +124,14 @@ void test('resolvePackageRoot: finds the one with package.json', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+void test('resolveMrdStagingDir: uses a stable URL fingerprint below project .tmp', () => {
+  const root = process.platform === 'win32' ? 'D:\\work\\aggregate' : '/work/aggregate';
+  const a = resolveMrdStagingDir(root, 'https://example.com/share_doc/?token=one');
+  const b = resolveMrdStagingDir(root, 'https://example.com/share_doc/?token=one');
+  const c = resolveMrdStagingDir(root, 'https://example.com/share_doc/?token=two');
+  assert.equal(a, b);
+  assert.match(a.replace(/\\/g, '/'), /\/\.tmp\/mrdoc-[a-f0-9]{12}$/);
+  assert.notEqual(a, c);
 });
