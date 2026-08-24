@@ -4,7 +4,7 @@
 // Releases are intentionally limited to the protected master branch so a
 // version tag can never be created from an unmerged feature branch.
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PKG_PATH = path.join(ROOT, 'package.json');
 const RELEASE_BRANCH = 'master';
+const PNPM_COMMAND = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
 const bump = process.argv[2] || 'patch';
 if (!['patch', 'minor', 'major'].includes(bump)) {
@@ -23,6 +24,12 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
 
 function run(command, args) {
   console.log(`\n> ${command} ${args.join(' ')}`);
+  if (process.platform === 'win32' && command === PNPM_COMMAND) {
+    // pnpm.cmd is a batch launcher. These arguments are fixed script commands,
+    // so running them through cmd.exe avoids the .cmd spawn limitation safely.
+    execSync(`pnpm ${args.join(' ')}`, { stdio: 'inherit', cwd: ROOT });
+    return;
+  }
   execFileSync(command, args, { stdio: 'inherit', cwd: ROOT });
 }
 
@@ -70,8 +77,8 @@ try {
   }
 
   // Validate before changing tracked files, so test failures leave no dirty tree.
-  run('pnpm', ['build']);
-  run('pnpm', ['test:package']);
+  run(PNPM_COMMAND, ['build']);
+  run(PNPM_COMMAND, ['test:package']);
 
   pkg.version = newVersion;
   writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
