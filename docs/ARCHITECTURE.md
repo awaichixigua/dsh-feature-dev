@@ -1,125 +1,139 @@
 # Architecture
 
-`dsh-feature-dev` 是一个运行在 DeepSeek Harness（DSH）中的 Cordis Bundle。它把需求交付拆成可恢复的工作流：Skill 负责把用户意图转换为工具调用，workflow 负责确定性编排，agent 负责完成单个阶段的工作。
+`dsh-feature-dev` 是运行在 DeepSeek Harness（DSH）中的 Cordis Bundle。它把需求交付分为三层：Skill 说明何时调用、Tool 处理输入和运行边界、Workflow 按持久化状态机驱动阶段与子代理。
 
-## 分层
+## 边界与原则
 
-| 层 | 位置 | 职责 |
+- Bundle 负责工作流编排、状态、门禁、产物校验、子代理派发和可选指标上报；业务代码只在用户指定的业务仓库内修改。
+- Skill 不直接执行或决定阶段跳转；子代理不直接修改运行状态。状态机和 `StateRepository` 是唯一的流程权威。
+- 所有用户输入在 `normalizeInvocation` 后成为 `FeatureDevInvocation`；后续层不再解析原始命令字符串。
+- 每个子代理只返回 `PhaseResult`。流程层负责验证产物、决定是否暂停、修复、继续或阻塞。
+
+## 模块划分
+
+| 模块 | 位置 | 职责 |
 | --- | --- | --- |
-| Bundle 入口 | `src/index.ts`、`cordis.patch.yml` | 注册 Skill provider 与 4 个 `feature_dev_*` 工具，提供默认配置。 |
-| Skill | `skills/*/SKILL.md` | 面向模型的轻量使用说明：何时调用哪个工作流、传哪些参数、如何处理结果。 |
-| Tool | `src/tools/` | 规范化调用参数、创建或读取状态、创建子代理执行器，并暴露 run / confirm / resume / status。 |
-| Workflow | `src/workflows/` | 定义阶段次序、条件分支、门禁与产物要求。 |
-| Runtime | `src/runtime/` | 状态机、持久化、门禁、路径保护、产物校验、生命周期与指标。 |
-| Agent | `agents/*.md` | 每个阶段的角色指令、输入、产物和输出约定。 |
-| Executor | `src/executors/` | 将阶段请求发送到 DSH 子代理，并将结构化或文本回复转换为 `PhaseResult`。 |
+| Bundle 入口 | `src/index.ts`、`cordis.patch.yml` | 注册一个 Skill provider、四个 `feature_dev_*` 工具和中文输出策略；解析默认配置。 |
+| Skill | `skills/*/SKILL.md` | 提供 8 个可发现工作流的使用约定。 |
+| Tool | `src/tools/` | 提供 `feature_dev_run`、`feature_dev_confirm`、`feature_dev_resume`、`feature_dev_status`。 |
+| Workflow | `src/workflows/` | 定义多阶段工作流、one-shot 工作流、分支准备、阶段驱动与产物要求。 |
+| Runtime | `src/runtime/` | 处理调用规范化、路径保护、状态机、门禁、状态持久化、产物校验与 Git 自动提交。 |
+| Executor | `src/executors/` | 将 `PhaseRequest` 交给 DSH 子代理，并解析结构化或文本形式的 `PhaseResult`。 |
+| Agent 与规则 | `agents/`、`rules/`、`templates/` | 阶段提示词、按需规则及文档模板。 |
+| Metrics | `src/metrics/` | 可选地记录 `code-gen-tdd` 与 `bugfix` 的运行指标。 |
 
-`lib/` 是由 TypeScript 编译出的发布产物；修改源码时应修改 `src/`、`skills/`、`agents/` 与文档，而不是直接编辑 `lib/`。
+`lib/` 是 TypeScript 编译产物；源码变更应落在 `src/`、`skills/`、`agents/`、`rules/`、`templates/` 或文档中，而不是直接编辑 `lib/`。
 
-## 指令执行链路
-
-以用户输入 `/implementation-plan <MRD URL> --feature-dir req/foo` 为例：
+## 执行链路
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant S as DSH Skill Provider
-    participant M as 对话模型
-    participant T as feature_dev_run
-    participant R as Workflow Runner
-    participant W as implementation-plan
+    participant S as Skill Provider
+    participant M as 主会话
+    participant T as feature_dev_* Tool
+    participant R as State Repository
+    participant W as Workflow Runner
     participant E as Subagent Executor
     participant A as 阶段子代理
-    participant P as State Repository
 
-    U->>S: 触发 /implementation-plan
-    S->>M: 注入 skills/implementation-plan/SKILL.md
-    M->>T: workflow、projectRoot、featureDir、mrdUrl
-    T->>P: 创建 ai/runs/<runId>/ 或读取 current-run.json
-    T->>R: runWorkflow(state, invocation)
-    R->>W: implementationPlan(...)
-    loop 每一个未完成阶段
-        W->>P: beginPhase + 写入状态
-        W->>E: PhaseRequest（上下文、agent 提示词路径）
-        E->>A: DSH 子代理调用（结构化 PhaseResult）
-        A-->>E: pass / warn / block / failed
-        E-->>W: 校验并返回 PhaseResult
-        W->>P: endPhase + 事件审计 + 产物校验
+    U->>S: 输入 /implementation-plan 等 Skill
+    S->>M: 注入对应 SKILL.md
+    M->>T: feature_dev_run
+    T->>T: normalizeInvocation
+    T->>R: 创建或加载 execution-state
+    T->>W: runWorkflow(state, invocation)
+    loop 未完成阶段
+        W->>R: beginPhase
+        W->>E: PhaseRequest
+        E->>A: 启动 DSH 子代理
+        A-->>E: PhaseResult
+        E-->>W: 解析结果
+        W->>R: endPhase、事件审计、产物校验
     end
-    W-->>T: completed / paused / blocked
-    T-->>M: runId、阶段、确认项、statePath
-    M-->>U: 结果或待确认提示
+    alt 需要确认或主会话操作
+        W-->>T: paused / blocked + pending 信息
+        T-->>M: runId、featureDir、statePath
+        M-->>U: 展示提示并等待输入
+        M->>T: feature_dev_confirm / feature_dev_resume
+    else 已完成
+        W-->>T: completed
+        T-->>M: 结果与可选 autoCommit 状态
+    end
 ```
 
-执行的控制权归 runtime，而不归 Skill 或子代理：
+生产环境使用 `ctx.subagents` 创建真实子代理。测试或离线夹具没有 DSH 上下文时，Tool 层改用 null port，使状态机和产物校验可独立测试。
 
-1. Skill 告诉模型调用 `feature_dev_run`，但不负责阶段编排。
-2. `runFeatureDev` 在 `src/tools/run.ts` 中校验并规范化入参，创建 `StateRepository` 和 `SubagentExecutor`，再交给 `runWorkflow`。
-3. workflow 调用 state machine 计算下一个合法阶段；`StateRepository` 在每次开始、结束、确认和恢复时原子写入状态与审计事件。
-4. `SubagentExecutor` 读取 `agents/<agent>.md`，将中文输出策略、角色指令、阶段上下文和 JSON 输出合约发送给子代理。
-5. 子代理只返回 `PhaseResult`；workflows/phase-driver 校验产物、决定是否 raise gate、阻塞或继续。
+## 核心合约与持久化
+
+| 合约 | 位置 | 用途 |
+| --- | --- | --- |
+| `FeatureDevInvocation` | `src/types/contracts.ts`、`schemas/invocation.schema.json` | 已规范化的工作流输入、路径、选项和模型覆盖。 |
+| `PhaseRequest` | `src/types/contracts.ts` | 工作流交给子代理的阶段、输入、提示词路径和产物要求。 |
+| `PhaseResult` | `src/types/contracts.ts`、`schemas/phase-result.schema.json` | 子代理完成、警告、阻塞或失败的结构化结果。 |
+| `ExecutionState` | `src/types/contracts.ts`、`schemas/execution-state.schema.json` | 运行状态、阶段历史、确认门、主会话操作和恢复上下文。 |
+
+状态目录为：
+
+```text
+<featureDir>/ai/current-run.json
+<featureDir>/ai/runs/<runId>/execution-state.json
+<featureDir>/ai/runs/<runId>/execution-state.md
+<featureDir>/ai/runs/<runId>/run-events.jsonl
+```
+
+`execution-state.json` 是恢复依据，`execution-state.md` 是可读投影，`run-events.jsonl` 是追加式审计记录。写入使用临时文件再重命名；旧版平铺状态会在首次读取时迁移到 `runs/<runId>/`。
 
 ## 工作流
 
-### implementation-plan
-
-```text
-INITIALIZED
-  → MRD_READER        (mrd-reader)
-  → SERVICE_ROUTER    (app-router)
-  → [post_service_router 确认门]
-  → BRANCH_GATE       (prepare service requirement branch)
-  → CLARIFY           (main-conversation action; no subagent)
-  → PRD               (prd-generator)
-  → [pre_prd 确认门]
-  → TECH_DESIGN       (tech-design)
-  → [pre_tech_design 确认门]
-  → COMPLETED
-```
-
-它生成 `mrd-original.md`、`mrd-clarified.md`、`prd.md` 和 `tech-design.md`。启动时 `featureDir` 是正式需求目录名的必填输入，URL 的抓取、MRD 解析和服务路由首先在 `.tmp/<featureDir 的目录名>` 中运行；既然已提供需求标识，不再使用 MRD URL hash，只有需求分支准备成功才沉淀到正式目录。若 app-router 无法从 MRD 确认可写服务，runtime 返回 `pendingMainAction.kind = route_services`，主会话收集并写入 `apps.json` 后恢复，不重新启动 app-router；这次用户输入即服务范围确认，随后直接进入分支门禁。MRD 澄清同样由主会话完成：runtime 返回 `pendingMainAction` 的输入/输出路径，主会话写入澄清文档后恢复，工作流只做本地校验并直接进入 PRD，不会启动澄清子代理。正常自动路由时，`post_service_router` 门仍在服务路由产出 `apps.json` 后触发。这里的 `pre_prd` 门是在 PRD 已写出后触发，用于进入技术设计前确认 PRD；`pre_tech_design` 门是在技术方案写出后触发，用于进入代码实现前确认方案。
-
-### code-gen-tdd
-
-```text
-TEST_SPEC → 确认 → IMPLEMENTATION → REVIEW
-  → TEST_GENERATION → TEST_EXECUTION → SUMMARY → COMPLETED
-                    ↘ 修复后回到相应阶段（受 repair 上限约束）
-```
-
-该 workflow 管理实现与验证的恢复循环。审查或测试失败可走修复分支，超过 `maxRepairAttempts` 后阻塞。
-
-### mrd-to-code
-
-`mrd-to-code` 是根编排器，按 `implementation-plan → code-gen-tdd → archive` 顺序运行，并复用同一个运行状态和 `runId`。任一确认门、阻塞或中断都会立即将控制权交还给用户。
-
-### 其他工作流
-
-| 工作流 | 类型 | 主要 agent / 结果 |
+| 工作流 | 实际阶段与分支 | 关键行为 |
 | --- | --- | --- |
-| `knowledge-base` | one-shot | `kb-update`；建立或更新知识库。 |
-| `prd-clarify` | one-shot | `mrd-clarify`；仅做需求澄清。 |
-| `influence-menu` | one-shot | `influence-menu`；输出只读影响面分析。 |
-| `bugfix` | 分支工作流 | `bugfix-locate` 后按分类进入文档修订或代码修复，再验证和报告。 |
-| `archive` | 线性工作流 | 快照、新鲜度检查、KB 更新、归档报告。 |
+| `implementation-plan` | `MRD_READER → SERVICE_ROUTER → BRANCH_GATE → CLARIFY → PRD → TECH_DESIGN` | 需求先在 `.tmp/<需求名>` 暂存；分支准备后将正式文档和状态落到主服务仓库。`CLARIFY` 是主会话操作，不启动澄清子代理。 |
+| `code-gen-tdd` | 测试规格 → 实现 → 审查 → 可选测试生成/执行 → 汇总；失败时进入修复分支 | 默认跳过测试生成与执行；只有 `--skip-unit-tests=false` 才启用。修复次数受 `maxRepairAttempts` 限制。 |
+| `bugfix` | `LOCATE → (DOC_REVISION?) → CODE_FIX → (VERIFY?) → REPORT` | `LOCATE` 成功后自动按分类选择分支；只有业务需求缺口会进入 `DOC_REVISION`。验证仅在请求单元测试时运行。 |
+| `archive` | `SNAPSHOT → FRESHNESS_CHECK → KB_UPDATE → REPORT` | 创建归档报告并检查、更新知识库。 |
+| `mrd-to-code` | `implementation-plan → code-gen-tdd → archive` | 一个 `runId` 和一份根状态贯穿三个子工作流；任一暂停或阻塞立即返回主会话。 |
+| `knowledge-base`、`prd-clarify`、`influence-menu` | 单次子代理调用 | 通过 `oneShot` 执行并按声明校验必要产物。 |
 
-## 确认、恢复和失败
+`implementation-plan` 的服务路由有两个主会话分支：服务范围不完整时返回 `pendingMainAction.kind = route_services`，主会话补全 `apps.json` 后恢复；需求澄清时返回 `clarify_mrd`，主会话写入 `mrd-clarified.md` 后恢复。两者都不会重新启动已完成的路由或澄清阶段。
 
-门禁由 `GateEngine` 创建，待确认项保存在状态文件。模型应向用户展示提示与选项；用户选择后调用 `feature_dev_confirm`：
+## 门禁、恢复与失败
 
-- `accept` / `proceed`：清除门禁，等待显式恢复。
-- `revise`：回退到创建该门禁的阶段，下一次恢复会重跑该阶段。
-- `abort`：结束本次运行。
+门禁由 `GateEngine` 创建并写入 `pendingConfirmations`。当前工作流实际使用的阻塞门包括：
 
-会话在用户完成非 `abort` 确认后应立即调用 `feature_dev_resume` 继续，不应要求用户再发一条 `/resume`。若状态包含 `pendingMainAction`，主会话应完成其中指定的文件操作，再使用工具最新返回的正式 `featureDir` 恢复。若普通阶段返回 `block` 或 `failed`，线性工作流会处于 `BLOCKED`，恢复时会重跑最近的失败阶段。每次运行的状态位于 `<featureDir>/ai/runs/<runId>/`，`current-run.json` 指向默认运行；恢复、查询和确认可显式传入 `runId`。
+- `post_service_router`：确认 `apps.json` 的可写服务范围后再准备需求分支。
+- `pre_prd`：PRD 生成后，确认其作为技术方案依据。
+- `pre_tech_design`：技术方案生成后，确认进入代码实现。
+- `post_test_spec`：测试规格生成后，确认继续 TDD 实施。
 
-旧版平铺在 `ai/` 下的 `execution-state.json`、`execution-state.md` 与 `run-events.jsonl` 会在首次读取时复制到对应的 `runs/<runId>/`，完成无损迁移后发布 `current-run.json`。旧文件仅作为兼容快照，不再参与后续写入。
+`feature_dev_confirm` 只处理用户选择。`accept` / `proceed` 清除门禁，`revise` 回退到创建该门的阶段，`abort` 结束运行。只有 `post_test_spec` 的 `accept` / `proceed` 会立即自动恢复；其他非终止选择之后，调用方使用最新的 `projectRoot`、`featureDir` 与 `runId` 调用 `feature_dev_resume`。
 
-## 关键约束
+`resume` 拒绝绕过未处理的确认门。阻塞运行在恢复前会回退最近失败阶段；已完成、已中止或失败的终态不能恢复，必须新建运行。
 
-- 子代理预算在整个 run 内累计，默认最大值为 24（`maxTotalAgents`）。
-- 生产环境通过 DSH 的 `ctx.subagents` 启动真实子代理；测试和离线夹具使用 null port。
-- 子代理的输出必须符合 `PhaseResult` 合约。无效 JSON、错误状态或缺少被要求的产物都会使阶段失败或阻塞。
-- `strictGates` 默认开启，阻塞确认不能被 `resume` 绕过。
+## Git 行为
 
-有关可用命令与示例，请阅读 [QUICK_START.md](QUICK_START.md)。
+`implementation-plan` 的 `BRANCH_GATE` 会读取 `apps.json` 的 `primary`、`collaborators` 与 `repositories`，为每个可写服务切换或创建 `fun_<版本>_<需求编号>_<标题>_<Git 用户名>` 分支。新分支从 `origin/release` 创建并以 `git push -u origin <branch>` 发布。
+
+`implementation-plan`、`code-gen-tdd` 和 `bugfix` 可传 `--auto-comit`（兼容 `--auto-commit`）。运行成功结束时，`src/runtime/auto-commit.ts` 在 `featureDir` 所属仓库执行 `git add --all`、`git commit` 与 `git push`；这会包含新增、删除及其他现有工作区变更。结果通过 `autoCommit.status` 返回。
+
+## 配置与指标
+
+`cordis.patch.yml` 提供默认值，`resolveConfig` 负责合并覆盖：
+
+| 配置 | 默认值 |
+| --- | --- |
+| `defaultWorkflow` | `code-gen-tdd` |
+| `subagentProvider` | `spawn` |
+| `strictGates` | `true` |
+| `maxTotalAgents` | `24` |
+| `maxRepairAttempts` | `3` |
+| `metrics.enabled` | `true` |
+| `metrics.workflows` | `code-gen-tdd`、`bugfix` |
+
+模型路由可按 `planning`、`coding`、`review`、`summary` 覆盖；未设置角色时由 DSH 父会话继承模型配置。指标上报仅挂接到 `code-gen-tdd` 与 `bugfix`，并由 Lifecycle 在完成时发送。
+
+## 发布内容
+
+发布包包含 `lib/` 以及 `skills/`、`agents/`、`rules/`、`templates/`、`scripts/`、`schemas/`、`CHANGELOG.md` 和 `cordis.patch.yml`。`docs/` 不在 `package.json#files` 中，因此文档更新不会进入 npm 包，但会随 Git 仓库分发。
+
+使用方式见 [QUICK_START.md](QUICK_START.md)，开发与发布步骤见 [DEVELOPMENT.md](DEVELOPMENT.md)。

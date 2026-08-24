@@ -183,6 +183,8 @@ function applyTokens(out: NormalizeInput, tokens: readonly string[]): void {
         applyKey(out, key, value);
       } else if (key === 'skip-unit-tests') {
         out.options = { ...(out.options ?? {}), skipUnitTests: true };
+      } else if (key === 'auto-comit' || key === 'auto-commit') {
+        out.options = { ...(out.options ?? {}), autoCommit: true };
       } else {
         out.options = { ...(out.options ?? {}), [key]: true } as import('../types/contracts.js').InvocationOptions;
       }
@@ -228,6 +230,10 @@ function applyKey(out: NormalizeInput, key: string, value: string): void {
       break;
     case 'bug':
       out.bugDescription = value;
+      break;
+    case 'auto-comit':
+    case 'auto-commit':
+      out.options = { ...(out.options ?? {}), autoCommit: parseBoolean(value, `--${key}`) };
       break;
     default:
       out.options = { ...(out.options ?? {}), [key]: value } as import('../types/contracts.js').InvocationOptions;

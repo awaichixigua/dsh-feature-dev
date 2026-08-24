@@ -37,7 +37,8 @@
         "generateUnitTestsOnly": { "type": "boolean" },
         "clarifyMode": { "type": "string", "enum": ["dialogue", "batch"] },
         "skipMrdClarify": { "type": "boolean" },
-        "singlePhase": { "type": "string" }
+        "singlePhase": { "type": "string" },
+        "autoCommit": { "type": "boolean", "description": "--auto-comit：成功完成后自动 git add --all、commit 并 push" }
       }
     },
     "modelOverrides": {

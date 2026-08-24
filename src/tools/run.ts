@@ -8,7 +8,7 @@ import { StateRepository } from '../runtime/state-repository.js';
 import { resolveMrdStagingDir, validateFeatureDir } from '../runtime/paths.js';
 import { basename } from 'node:path';
 import { DshCompatibilityError } from '../runtime/errors.js';
-import type { FeatureDevInvocation, PendingConfirmation, PendingMainAction, PhaseResult } from '../types/contracts.js';
+import type { AutoCommitResult, FeatureDevInvocation, PendingConfirmation, PendingMainAction, PhaseResult } from '../types/contracts.js';
 import { runWorkflow } from '../workflows/runner.js';
 import { makeDshSubagentPort, makeNullSubagentPort } from '../executors/spawn-port.js';
 import { SubagentExecutor } from '../executors/protocol.js';
@@ -19,6 +19,7 @@ import { ensureBugCase } from '../runtime/bug-case.js';
 import { Lifecycle } from '../runtime/lifecycle.js';
 import { RunMetricsReporter } from '../metrics/reporter.js';
 import type { WorkflowId } from '../types/contracts.js';
+import { autoCommitAndPush } from '../runtime/auto-commit.js';
 
 export interface RunArgs {
   workflow?: string;
@@ -43,6 +44,7 @@ export interface RunOutput {
   pendingConfirmations: PendingConfirmation[];
   pendingMainAction?: PendingMainAction;
   lastPhaseResult?: PhaseResult;
+  autoCommit?: AutoCommitResult;
 }
 
 export async function runFeatureDev(
@@ -114,6 +116,7 @@ export async function runFeatureDev(
       featureId: inv.featureId,
       bugDescription: inv.bugDescription,
       unitTestsRequested: inv.options.unitTests,
+      ...(inv.options.autoCommit ? { autoCommitRequested: true } : {}),
       ...(inv.workflow === 'bugfix' ? { bugCaseDir } : {}),
       modelOverrides: inv.modelOverrides,
       // Orchestrator workflows own their initial activeWorkflow.
@@ -184,6 +187,9 @@ export async function runFeatureDev(
     // exits, otherwise a crash right after `return` would leave the
     // report un-flushed and a future resume would skip it.
     await lifecycle.onRunEnd(finalState);
+    const autoCommit = shouldAutoCommit(finalState, inv) && isAutoCommitWorkflow(finalState.workflow)
+      ? autoCommitAndPush({ cwd: finalState.featureDir, workflow: finalState.workflow, runId: finalState.runId })
+      : undefined;
     return ok({
       runId: finalState.runId,
       status: finalState.status,
@@ -193,10 +199,22 @@ export async function runFeatureDev(
       pendingConfirmations: finalState.pendingConfirmations,
       ...(finalState.pendingMainAction ? { pendingMainAction: finalState.pendingMainAction } : {}),
       ...(finalState.lastPhaseResult ? { lastPhaseResult: finalState.lastPhaseResult } : {}),
+      ...(autoCommit ? { autoCommit } : {}),
     });
   } catch (e) {
     return fail(e);
   }
+}
+
+function shouldAutoCommit(state: import('../types/contracts.js').ExecutionState, inv: FeatureDevInvocation): boolean {
+  return state.status === 'completed'
+    && (inv.options.autoCommit || state.autoCommitRequested === true);
+}
+
+function isAutoCommitWorkflow(
+  workflow: WorkflowId
+): workflow is Extract<WorkflowId, 'implementation-plan' | 'code-gen-tdd' | 'bugfix'> {
+  return workflow === 'implementation-plan' || workflow === 'code-gen-tdd' || workflow === 'bugfix';
 }
 
 /**

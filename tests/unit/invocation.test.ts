@@ -180,6 +180,31 @@ void test('parseSkillArgv: --skip-unit-tests=false enables unit tests', () => {
   assert.equal(r.options?.skipUnitTests, false);
 });
 
+void test('parseSkillArgv: --auto-comit enables automatic Git publishing', () => {
+  const r = parseSkillArgv('code-gen-tdd --feature-dir req/foo --auto-comit');
+  assert.equal(r.options?.autoCommit, true);
+  const normalized = normalizeInvocation(
+    { workflow: 'code-gen-tdd', featureDir: process.cwd(), options: r.options },
+    { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'code-gen-tdd' }
+  );
+  assert.equal(normalized.options.autoCommit, true);
+});
+
+void test('parseSkillArgv: --auto-commit is accepted as an alias', () => {
+  const r = parseSkillArgv('bugfix --feature-dir req/foo --bug parser fails --auto-commit');
+  assert.equal(r.options?.autoCommit, true);
+});
+
+void test('normalizeInvocation: rejects auto commit for unsupported workflows', () => {
+  assert.throws(
+    () => normalizeInvocation(
+      { workflow: 'archive', options: { autoCommit: true } },
+      { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'archive' }
+    ),
+    /auto-comit is supported only/
+  );
+});
+
 void test('parseSkillArgv: extracts a bugfix case id', () => {
   const r = parseSkillArgv('bugfix --feature-dir req/foo --bug-id 13 --bug 参数推断优先级错误');
   assert.equal(r.bugCaseId, '13');

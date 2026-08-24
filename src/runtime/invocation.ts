@@ -118,6 +118,10 @@ export function normalizeInvocation(
   }
   const skipUnitTests = parseBooleanOption(opt.skipUnitTests, 'options.skipUnitTests');
   const legacyUnitTests = parseBooleanOption(opt.unitTests, 'options.unitTests');
+  const autoCommit = parseBooleanOption(opt.autoCommit, 'options.autoCommit') ?? false;
+  if (autoCommit && workflow !== 'implementation-plan' && workflow !== 'code-gen-tdd' && workflow !== 'bugfix') {
+    throw new ValidationError('--auto-comit is supported only by implementation-plan, code-gen-tdd, and bugfix', { workflow });
+  }
 
   // paths
   const projectRoot = resolveProjectRoot({
@@ -148,6 +152,7 @@ export function normalizeInvocation(
     clarifyMode: opt.clarifyMode ?? 'dialogue',
     skipMrdClarify: !!opt.skipMrdClarify,
     singlePhase: opt.singlePhase,
+    autoCommit,
   };
 
   const out: FeatureDevInvocation = {
@@ -200,6 +205,8 @@ export function parseSkillArgv(argv: string): NormalizeInput {
         if (VALUE_FLAGS.has(key) && i + 1 < tokens.length) {
           const value = tokens[++i]!;
           applyKey(out, key, value);
+        } else if (key === 'auto-comit' || key === 'auto-commit') {
+          out.options = { ...(out.options ?? {}), autoCommit: true } as InvocationOptions;
         } else {
           out.options = { ...(out.options ?? {}), [key]: true } as InvocationOptions;
         }
@@ -298,6 +305,10 @@ function applyKey(out: NormalizeInput, key: string, value: string): void {
       break;
     case 'bug-id':
       out.bugCaseId = value;
+      break;
+    case 'auto-comit':
+    case 'auto-commit':
+      out.options = { ...(out.options ?? {}), autoCommit: parseBooleanOption(value, `--${key}`) };
       break;
     default:
       out.options = { ...(out.options ?? {}), [key]: value } as InvocationOptions;

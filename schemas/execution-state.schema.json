@@ -46,6 +46,7 @@
     "featureDir": { "type": "string" },
     "featureId": { "type": "string" },
     "bugDescription": { "type": "string" },
+    "autoCommitRequested": { "type": "boolean" },
     "currentPhase": { "type": "string" },
     "phaseHistory": {
       "type": "array",

@@ -3,7 +3,7 @@ name: implementation-plan
 description: 从 MRD 或直接输入的需求生成 PRD 和技术方案；仅产出文档，不生成业务代码。触发词：生成 PRD、生成技术方案、生成实施方案。
 user-invocable: true
 disable-model-invocation: false
-argument-hint: <MRD URL 或需求描述> --feature-dir <需求目录名> [--clarify-mode=dialogue|batch]
+argument-hint: <MRD URL 或需求描述> --feature-dir <需求目录名> [--clarify-mode=dialogue|batch] [--auto-comit]
 ---
 
 # implementation-plan
@@ -32,6 +32,7 @@ argument-hint: <MRD URL 或需求描述> --feature-dir <需求目录名> [--clar
 /implementation-plan https://example.com/share_doc/?token=xxx --feature-dir req/create-order
 /implementation-plan https://example.com/share_doc/?token=xxx --feature-dir req/create-order --clarify-mode=batch
 /implementation-plan "用户可按订单编号查询物流状态，并查看最新节点" --feature-dir req/query-logistics
+/implementation-plan "用户可按订单编号查询物流状态，并查看最新节点" --feature-dir req/query-logistics --auto-comit
 ```
 
 调用 `feature_dev_run`，参数为：
@@ -43,8 +44,10 @@ argument-hint: <MRD URL 或需求描述> --feature-dir <需求目录名> [--clar
   "featureDir": "<需求目录>",
   "mrdUrl": "<MRD URL；与 rawUserRequest 二选一>",
   "rawUserRequest": "<直接输入的需求；与 mrdUrl 二选一>",
-  "options": { "clarifyMode": "dialogue 或 batch" }
+  "options": { "clarifyMode": "dialogue 或 batch", "autoCommit": true }
 }
 ```
+
+`--auto-comit` 在工作流成功完成后自动执行 `git add --all`、`git commit` 和 `git push`，因此包括新增文件和删除。`--auto-commit` 可作为兼容拼写。
 
 工具返回待确认项时，展示其提示和选项；用户选择后调用 `feature_dev_confirm`。对于 `accept`、`proceed`、`revise`、`continue`、`skip` 或 `update`，确认成功后立即使用工具返回的相同 `projectRoot` 和最新 `featureDir` 调用 `feature_dev_resume`，并向用户报告恢复后的结果；`abort` 不恢复。不要自行跳过确认、自动确认新的确认门或轮询。完成时报告 `runId`、产物和 `statePath`；失败或中止时报告错误与解除条件。

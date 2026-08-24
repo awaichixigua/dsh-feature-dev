@@ -29,6 +29,11 @@ void test('--skip-unit-tests=false enables tests through the skill argument pars
   assert.equal(r.options?.skipUnitTests, false);
 });
 
+void test('--auto-comit enables Git publishing through the skill argument parser', () => {
+  const r = parseToolArgv('--feature-dir req/create-order --auto-comit', 'code-gen-tdd');
+  assert.equal(r.options?.autoCommit, true);
+});
+
 void test('positional https URL becomes mrdUrl', () => {
   const r = parseToolArgv('https://example.com/share_doc/?token=abc', 'implementation-plan');
   assert.equal(r.workflow, 'implementation-plan');

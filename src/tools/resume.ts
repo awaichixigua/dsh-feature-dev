@@ -13,13 +13,14 @@ import { StateRepository, isTerminalStatus, rewindMostRecentFailure } from '../r
 import { resolveProjectRoot, validateFeatureDir } from '../runtime/paths.js';
 import { runWorkflow } from '../workflows/runner.js';
 import { ConflictError, DshCompatibilityError, NotFoundError } from '../runtime/errors.js';
-import type { FeatureDevInvocation, PendingConfirmation, PendingMainAction, PhaseResult, WorkflowId } from '../types/contracts.js';
+import type { AutoCommitResult, FeatureDevInvocation, PendingConfirmation, PendingMainAction, PhaseResult, WorkflowId } from '../types/contracts.js';
 import { makeDshSubagentPort, makeNullSubagentPort } from '../executors/spawn-port.js';
 import { SubagentExecutor } from '../executors/protocol.js';
 import type { DshContext } from '../dsh/context.js';
 import type { Agent } from '../dsh/sdk.js';
 import { Lifecycle } from '../runtime/lifecycle.js';
 import { RunMetricsReporter } from '../metrics/reporter.js';
+import { autoCommitAndPush } from '../runtime/auto-commit.js';
 
 export interface ResumeArgs {
   projectRoot: string;
@@ -47,6 +48,7 @@ export interface ResumeOutput {
   pendingConfirmations: PendingConfirmation[];
   pendingMainAction?: PendingMainAction;
   lastPhaseResult?: PhaseResult;
+  autoCommit?: AutoCommitResult;
 }
 
 export async function resumeFeatureDev(
@@ -116,6 +118,7 @@ export async function resumeFeatureDev(
         unitTests: Boolean(state.unitTestsRequested),
         generateUnitTestsOnly: false,
         clarifyMode: 'dialogue',
+        autoCommit: state.autoCommitRequested === true,
       },
     };
     const config = ctx.config ?? (await import('../config.js')).resolveConfig({});
@@ -157,6 +160,9 @@ export async function resumeFeatureDev(
       lifecycle,
     });
     await lifecycle.onRunEnd(final);
+    const autoCommit = shouldAutoCommit(final) && isAutoCommitWorkflow(final.workflow)
+      ? autoCommitAndPush({ cwd: final.featureDir, workflow: final.workflow, runId: final.runId })
+      : undefined;
     return ok({
       runId: final.runId,
       status: final.status,
@@ -167,10 +173,22 @@ export async function resumeFeatureDev(
       pendingConfirmations: final.pendingConfirmations,
       ...(final.pendingMainAction ? { pendingMainAction: final.pendingMainAction } : {}),
       ...(final.lastPhaseResult ? { lastPhaseResult: final.lastPhaseResult } : {}),
+      ...(autoCommit ? { autoCommit } : {}),
     });
   } catch (e) {
     return fail(e);
   }
+}
+
+function shouldAutoCommit(state: import('../types/contracts.js').ExecutionState): boolean {
+  return state.status === 'completed'
+    && state.autoCommitRequested === true;
+}
+
+function isAutoCommitWorkflow(
+  workflow: WorkflowId
+): workflow is Extract<WorkflowId, 'implementation-plan' | 'code-gen-tdd' | 'bugfix'> {
+  return workflow === 'implementation-plan' || workflow === 'code-gen-tdd' || workflow === 'bugfix';
 }
 
 /**

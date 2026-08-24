@@ -127,6 +127,7 @@ export class StateRepository {
     bugDescription?: string;
     bugCaseDir?: string;
     unitTestsRequested?: boolean;
+    autoCommitRequested?: boolean;
     modelOverrides?: ExecutionState['modelOverrides'];
     /** Orchestrator workflows (mrd-to-code) set this so the runner can
      *  restore the orchestration identity after a sub-workflow
@@ -156,6 +157,7 @@ export class StateRepository {
       bugDescription: args.bugDescription,
       bugCaseDir: args.bugCaseDir,
       unitTestsRequested: args.unitTestsRequested,
+      autoCommitRequested: args.autoCommitRequested,
       currentPhase: getInitialPhase(args.activeWorkflow ?? args.workflow),
       phaseHistory: [],
       startedAt: now,
@@ -183,6 +185,7 @@ export class StateRepository {
     bugDescription?: string;
     bugCaseDir?: string;
     unitTestsRequested?: boolean;
+    autoCommitRequested?: boolean;
     modelOverrides?: ExecutionState['modelOverrides'];
     orchestratorWorkflow?: WorkflowId;
     activeWorkflow?: WorkflowId;
@@ -238,6 +241,9 @@ export class StateRepository {
       if (args.bugDescription) s.bugDescription = args.bugDescription;
       if (args.unitTestsRequested !== undefined) {
         s.unitTestsRequested = args.unitTestsRequested;
+      }
+      if (args.autoCommitRequested === true) {
+        s.autoCommitRequested = true;
       }
       if (args.workflow === 'bugfix') {
         if (args.bugCaseDir) s.bugCaseDir = args.bugCaseDir;

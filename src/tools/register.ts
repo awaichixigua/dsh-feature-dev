@@ -109,7 +109,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition[] {
   return [
     defineTool({
       name: 'feature_dev_run',
-      description: '启动 feature_dev 工作流，并在 `<featureDir>/ai/` 下持久化状态。',
+      description: '启动 feature_dev 工作流，并在 `<featureDir>/ai/` 下持久化状态。implementation-plan、code-gen-tdd 和 bugfix 可设置 options.autoCommit=true（命令参数 --auto-comit）；成功后会自动提交并推送所有变更，包括新增文件。',
       parameters: {
         workflow: WORKFLOW,
         projectRoot: PROJECT_ROOT,

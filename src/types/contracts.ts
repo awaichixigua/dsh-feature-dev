@@ -56,6 +56,16 @@ export interface InvocationOptions {
   skipMrdClarify?: boolean;
   /** Run only a single named phase (advanced; mostly for testing). */
   singlePhase?: string;
+  /** Commit and push all workflow changes after a successful run. */
+  autoCommit?: boolean;
+}
+
+/** Outcome of an optional `--auto-comit` Git publish step. */
+export interface AutoCommitResult {
+  status: 'committed_and_pushed' | 'no_changes' | 'commit_failed' | 'push_failed';
+  repository?: string;
+  commit?: string;
+  error?: string;
 }
 
 export type ModelRole = 'planning' | 'coding' | 'review' | 'summary';
@@ -162,6 +172,8 @@ export interface ExecutionState {
   bugCaseDir?: string;
   /** Whether this run should generate and execute unit tests; survives resume. */
   unitTestsRequested?: boolean;
+  /** Whether a completed supported workflow should publish its changes; survives resume. */
+  autoCommitRequested?: boolean;
   currentPhase: string;
   phaseHistory: PhaseHistoryEntry[];
   startedAt: string;
