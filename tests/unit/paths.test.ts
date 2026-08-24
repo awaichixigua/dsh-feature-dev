@@ -85,6 +85,10 @@ void test('isInside: returns true for child', () => {
   assert.ok(isInside('/a', '/a'));
 });
 
+void test('isInside: compares Windows paths case-insensitively', { skip: process.platform !== 'win32' }, () => {
+  assert.ok(isInside('D:\\Workspace\\Services\\Order', 'd:\\workspace'));
+});
+
 void test('resolveResourceBase: requires inside packageRoot', () => {
   // /b is absolute; we want either "must not be absolute" OR "escaped" —
   // both are valid rejections. We accept either.

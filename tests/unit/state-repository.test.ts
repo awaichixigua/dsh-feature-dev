@@ -136,6 +136,28 @@ void test('loadOrCreate rejects a different workflow while the current run is ac
   }
 });
 
+void test('loadOrCreate rejects switching feature points on an active TDD run', () => {
+  const dir = makeTmp();
+  try {
+    const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
+    const state = repo.create({
+      workflow: 'code-gen-tdd', projectRoot: dir, featureDir: dir, featureId: 'F-001',
+    });
+    repo.beginPhase(state, 'PHASE1_TEST_SPEC');
+    repo.endPhase(state, 'PHASE1_TEST_SPEC', {
+      status: 'block', summary: 'retry', artifacts: [], evidence: ['blocked'], changedFiles: [], blocker: 'retry',
+    });
+    repo.transition(state, 'BLOCKED');
+
+    assert.throws(() => repo.loadOrCreate({
+      workflow: 'code-gen-tdd', projectRoot: dir, featureDir: dir, featureId: 'F-002',
+    }), /different feature point is already active/);
+    assert.equal(repo.read().featureId, 'F-001');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 void test('begin/end phase appends history and rewrites MD', () => {
   const dir = makeTmp();
   try {

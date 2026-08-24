@@ -216,6 +216,13 @@ export class StateRepository {
           requestedWorkflow: args.workflow,
         });
       }
+      if (s.workflow === 'code-gen-tdd' && s.featureId !== args.featureId) {
+        throw new ConflictError('A different feature point is already active for this requirement', {
+          activeRunId: s.runId,
+          activeFeatureId: s.featureId ?? null,
+          requestedFeatureId: args.featureId ?? null,
+        });
+      }
       // Pending confirmation gates MUST be resolved before any
       // `run` / `resume` action advances the workflow. Without
       // this guard, calling `feature_dev_resume` while a gate is

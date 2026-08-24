@@ -188,7 +188,7 @@ Bugfix 先运行只读的 `LOCATE`，定位成功后会自动进入对应分支�
 /bugfix --feature-dir req/2.0.0_103111_fastjson替换为jackson bug描述：支付失败后订单状态没有回滚 --auto-comit
 ```
 
-仅在工作流状态为 `completed` 时才执行。单服务需求会在 `featureDir` 所属 Git 仓库执行；多服务的 `implementation-plan` 与 `code-gen-tdd` 会对每个可写服务仓库分别执行：
+仅在工作流状态为 `completed` 时才执行。单服务需求会在 `featureDir` 所属 Git 仓库执行；多服务的 `implementation-plan` 与全量 `code-gen-tdd` 会对每个可写服务仓库分别执行，指定 `--feature-id` 的 `code-gen-tdd` 只提交该功能点映射到的服务：
 
 ```text
 git add --all

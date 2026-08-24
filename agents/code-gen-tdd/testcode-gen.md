@@ -6,8 +6,9 @@ model_role: coding
 output: test files
 ---
 
-<!-- When inputs.featureId is present, generate only the tests for
-inputs.feature in the current service, using inputs.testSpecPath. -->
+## 功能点范围硬约束
+
+当 `inputs.featureId` 存在时，只根据 `inputs.testSpecPath` 为 `inputs.feature` 在当前服务中的职责生成测试。
 
 # Agent: testcode-gen
 

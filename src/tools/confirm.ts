@@ -217,14 +217,6 @@ function finishOk(
   });
 }
 
-function lastFinishedPhase(state: import('../types/contracts.js').ExecutionState): string | undefined {
-  for (let i = state.phaseHistory.length - 1; i >= 0; i--) {
-    const e = state.phaseHistory[i]!;
-    if (e.status !== 'pending') return e.phase;
-  }
-  return state.currentPhase;
-}
-
 function rewindToPhase(state: import('../types/contracts.js').ExecutionState, phase: string): void {
   // Drop history entries for `phase` and any subsequent phase. The state
   // machine records the last completed phase, so rewind to the phase before

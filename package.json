@@ -1,6 +1,6 @@
 {
   "name": "@engios/dsh-feature-dev",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Native MRD-to-code workflow bundle for DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",

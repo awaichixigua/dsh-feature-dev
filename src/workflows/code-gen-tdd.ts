@@ -32,7 +32,12 @@ import { basename, resolve } from 'node:path';
 import { resolveServiceKbContextPath } from '../runtime/paths.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { runPhaseSubagent } from './subagent-runner.js';
-import { resolveServiceTargets, type ServiceTarget } from '../runtime/service-targets.js';
+import {
+  resolveServiceTargets,
+  selectRepairTargets,
+  serviceStatusEvidence,
+  type ServiceTarget,
+} from '../runtime/service-targets.js';
 import { selectFeatureTargets, type FeatureMapEntry } from '../runtime/feature-map.js';
 
 interface PhaseDef {
@@ -170,7 +175,10 @@ async function driveTdd(
     }
     deps.repo.beginPhase(state, def.name);
     deps.lifecycle?.onPhaseStart(state, def.name);
-    const result = await runSubagentPhase(state, inv, deps, def, targets, selectedFeatureId, feature, featureMapPath);
+    const phaseTargets = def.isRepair
+      ? selectRepairTargets(targets, state.lastPhaseResult?.evidence)
+      : targets;
+    const result = await runSubagentPhase(state, inv, deps, def, phaseTargets, selectedFeatureId, feature, featureMapPath);
     const valid = validateArtifacts(inv.projectRoot, def.artifacts);
     if (!valid.ok && def.artifacts.length > 0) {
       const failures = valid.results.filter((r) => !r.ok);
@@ -246,9 +254,10 @@ async function runSubagentPhase(
   feature?: FeatureMapEntry,
   featureMapPath?: string
 ): Promise<PhaseResult> {
-  const results: PhaseResult[] = [];
+  const results: Array<{ service: string; result: PhaseResult }> = [];
   for (const target of targets) {
-    results.push(await runSubagentForTarget(state, inv, deps, def, target, selectedFeatureId, feature, featureMapPath));
+    const result = await runSubagentForTarget(state, inv, deps, def, target, selectedFeatureId, feature, featureMapPath);
+    results.push({ service: target.service, result });
   }
   return combineTargetResults(results);
 }
@@ -282,7 +291,7 @@ async function runSubagentForTarget(
       featureId: selectedFeatureId,
       service: target.service,
       ...(feature ? { feature } : {}),
-      ...(featureMapPath ? { featureMapPath } : {}),
+      ...(featureMapPath ? { featureMapPath: resolve(target.featureDir, 'feature-map.json') } : {}),
       testSpecPath: featureArtifactPath(target, selectedFeatureId, 'test_spec.md'),
       codeReviewPath: featureArtifactPath(target, selectedFeatureId, 'code-review.md'),
       unitTestReportPath: featureArtifactPath(target, selectedFeatureId, 'unit_test_report.md'),
@@ -322,18 +331,21 @@ async function runSubagentForTarget(
   }
 }
 
-function combineTargetResults(results: PhaseResult[]): PhaseResult {
-  const failed = results.find((result) => result.status === 'failed');
-  const blocked = results.find((result) => result.status === 'block');
-  const warned = results.some((result) => result.status === 'warn');
+function combineTargetResults(results: Array<{ service: string; result: PhaseResult }>): PhaseResult {
+  const failed = results.find(({ result }) => result.status === 'failed');
+  const blocked = results.find(({ result }) => result.status === 'block');
+  const warned = results.some(({ result }) => result.status === 'warn');
   const selected = failed ?? blocked;
   return {
-    status: selected?.status ?? (warned ? 'warn' : 'pass'),
-    summary: results.map((result) => result.summary).join('；'),
-    artifacts: results.flatMap((result) => result.artifacts),
-    evidence: results.flatMap((result) => result.evidence),
-    changedFiles: results.flatMap((result) => result.changedFiles),
-    ...(selected?.blocker ? { blocker: selected.blocker } : {}),
+    status: selected?.result.status ?? (warned ? 'warn' : 'pass'),
+    summary: results.map(({ service, result }) => `[${service}] ${result.summary}`).join('；'),
+    artifacts: results.flatMap(({ result }) => result.artifacts),
+    evidence: results.flatMap(({ service, result }) => [
+      serviceStatusEvidence(service, result.status),
+      ...result.evidence,
+    ]),
+    changedFiles: results.flatMap(({ result }) => result.changedFiles),
+    ...(selected?.result.blocker ? { blocker: `[${selected.service}] ${selected.result.blocker}` } : {}),
   };
 }
 

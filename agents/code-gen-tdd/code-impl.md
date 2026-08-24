@@ -6,9 +6,9 @@ model_role: coding
 output: source files
 ---
 
-<!-- When inputs.featureId is present, implement only inputs.feature in the
-current service. Its service membership and acceptance criteria are authoritative;
-do not implement unrelated feature points. -->
+## 功能点范围硬约束
+
+当 `inputs.featureId` 存在时，只实现 `inputs.feature` 在当前服务中的职责。其服务归属和验收标准是权威边界，不得顺带实现其他功能点。
 
 # Agent: code-impl
 

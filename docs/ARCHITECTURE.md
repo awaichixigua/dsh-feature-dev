@@ -114,7 +114,7 @@ sequenceDiagram
 
 `implementation-plan` 的 `BRANCH_GATE` 会读取 `apps.json` 的 `primary`、`collaborators` 与 `repositories`，为每个可写服务切换或创建 `fun_<版本>_<需求编号>_<标题>_<Git 用户名>` 分支。新分支从 `origin/release` 创建并以 `git push -u origin <branch>` 发布。
 
-`implementation-plan`、`code-gen-tdd` 和 `bugfix` 可传 `--auto-comit`（兼容 `--auto-commit`）。运行成功结束时，`src/runtime/auto-commit.ts` 执行 `git add --all`、`git commit` 与 `git push`；多服务的 planning/TDD 会逐个可写服务仓库执行。它会包含新增、删除及其他现有工作区变更；逐服务结果通过 `autoCommit.services` 返回。
+`implementation-plan`、`code-gen-tdd` 和 `bugfix` 可传 `--auto-comit`（兼容 `--auto-commit`）。运行成功结束时，`src/runtime/auto-commit.ts` 执行 `git add --all`、`git commit` 与 `git push`；多服务 planning 和全量 TDD 会逐个可写服务仓库执行，指定功能点的 TDD 只处理 `feature-map.json` 映射到的服务。它会包含目标仓库中的新增、删除及其他现有工作区变更；逐服务结果通过 `autoCommit.services` 返回。
 
 ## 配置与指标
 

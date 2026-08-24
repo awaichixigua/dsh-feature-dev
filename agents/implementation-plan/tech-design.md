@@ -6,8 +6,9 @@ model_role: planning
 output: tech-design.md
 ---
 
-<!--
-Feature-to-service contract: tech-design.md must include a 功能点 × 服务 matrix.
+## 功能点服务映射硬约束
+
+`tech-design.md` 必须包含“功能点 × 服务”矩阵。
 For every feature, use a stable F-<id>, list every writable owning service from
 apps.json, the primary owner, interfaces/events, and acceptance criteria.
 Also create <featureDir>/feature-map.json exactly in this form:
@@ -16,13 +17,13 @@ Also create <featureDir>/feature-map.json exactly in this form:
   "features": [{
     "id": "F-001",
     "name": "创建订单",
+    "primaryService": "order-service",
     "services": ["order-service", "inventory-service"],
     "acceptanceCriteria": ["AC-001", "AC-002"]
   }]
 }
 services must contain only writable services declared in apps.json. This JSON
 artifact is required even for a single service or a single feature.
--->
 
 # Agent: tech-design
 

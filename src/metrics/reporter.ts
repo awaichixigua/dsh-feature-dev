@@ -51,7 +51,6 @@ import {
   metricsHome,
   queueFileFor,
   readJson,
-  readJsonOptional,
   runStatePath,
   updateExecutionStateMetrics,
 } from './state.js';
@@ -134,8 +133,6 @@ export interface FlushQueueArgs {
   maxItems?: number;
   force?: boolean;
 }
-
-type RunArgs = StartRunArgs | TimerArgs | FinishRunArgs | FlushQueueArgs;
 
 interface NormalisedArgs {
   reportUrl: string;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { selectFeatureTargets } from '../../src/runtime/feature-map.ts';
+import { selectFeatureTargets, validateFeatureMap } from '../../src/runtime/feature-map.ts';
 import type { ServiceTarget } from '../../src/runtime/service-targets.ts';
 
 void test('selectFeatureTargets limits a feature run to its mapped services', () => {
@@ -25,6 +25,36 @@ void test('selectFeatureTargets limits a feature run to its mapped services', ()
     assert.deepEqual(selection.feature, {
       id: 'F-001', name: '创建订单', services: ['orders', 'payment'], acceptanceCriteria: ['AC-001'],
     });
+  } finally {
+    rmSync(featureDir, { recursive: true, force: true });
+  }
+});
+
+void test('validateFeatureMap rejects an unmapped service before code generation', () => {
+  const featureDir = mkdtempSync(join(tmpdir(), 'dsh-feature-map-'));
+  try {
+    writeFileSync(join(featureDir, 'feature-map.json'), JSON.stringify({
+      features: [{ id: 'F-001', name: '创建订单', primaryService: 'orders', services: ['orders', 'missing-service'] }],
+    }));
+    assert.throws(
+      () => validateFeatureMap(featureDir, [{ service: 'orders', projectRoot: '/repos/orders', featureDir }]),
+      /references services absent from apps.json: missing-service/
+    );
+  } finally {
+    rmSync(featureDir, { recursive: true, force: true });
+  }
+});
+
+void test('validateFeatureMap requires primaryService to belong to services when provided', () => {
+  const featureDir = mkdtempSync(join(tmpdir(), 'dsh-feature-map-'));
+  try {
+    writeFileSync(join(featureDir, 'feature-map.json'), JSON.stringify({
+      features: [{ id: 'F-001', name: '创建订单', primaryService: 'payment', services: ['orders'] }],
+    }));
+    assert.throws(
+      () => validateFeatureMap(featureDir, [{ service: 'orders', projectRoot: '/repos/orders', featureDir }]),
+      /primaryService must be included in services/
+    );
   } finally {
     rmSync(featureDir, { recursive: true, force: true });
   }

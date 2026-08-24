@@ -6,9 +6,9 @@ model_role: planning
 output: test_spec.md
 ---
 
-<!-- When inputs.featureId is present, implement only inputs.feature in the
-current service. Write the specification to inputs.testSpecPath; never overwrite
-another feature's test specification. -->
+## 功能点范围硬约束
+
+当 `inputs.featureId` 存在时，只为 `inputs.feature` 在当前服务中的职责生成测试规格，并写入 `inputs.testSpecPath`；不得覆盖其他功能点的测试规格。
 
 # Agent: tdd-test-spec
 

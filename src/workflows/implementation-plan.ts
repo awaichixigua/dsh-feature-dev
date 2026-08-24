@@ -28,6 +28,7 @@ import { runPhaseSubagent } from './subagent-runner.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { prepareRequirementBranches } from './branch-gate.js';
 import { resolveServiceTargets } from '../runtime/service-targets.js';
+import { validateFeatureMap } from '../runtime/feature-map.js';
 
 export async function implementationPlan(
   state: ExecutionState,
@@ -100,7 +101,7 @@ export async function implementationPlan(
       ],
       gate: 'pre_tech_design',
       subagent: 'tech-design',
-      run: makeRunner('tech-design'),
+      run: runTechDesign,
       afterPass: (current, currentInv) => {
         syncPlanningArtifact(current, currentInv, 'tech-design.md');
         syncPlanningArtifact(current, currentInv, 'feature-map.json');
@@ -115,18 +116,25 @@ function syncPlanningArtifact(state: ExecutionState, inv: FeatureDevInvocation, 
   const source = resolve(state.featureDir, filename);
   if (!existsSync(source)) throw new Error(`Planning artifact is missing: ${source}`);
   const primary = resolve(state.featureDir);
-  // Older single-service plans can have a lightweight apps.json without
-  // repository routing. There is no collaborator destination in that case.
-  let targets: ReturnType<typeof resolveServiceTargets>;
-  try {
-    targets = resolveServiceTargets(inv.projectRoot, state.featureDir);
-  } catch {
-    return;
-  }
+  // Older single-service runs can contain a placeholder apps.json. Preserve
+  // that compatibility, while allowing errors in a real routed file to fail.
+  if (!hasServiceRouting(resolve(state.featureDir, 'apps.json'))) return;
+  const targets = resolveServiceTargets(inv.projectRoot, state.featureDir);
   for (const target of targets) {
     if (resolve(target.featureDir) === primary) continue;
     mkdirSync(target.featureDir, { recursive: true });
     copyFileSync(source, resolve(target.featureDir, filename));
+  }
+}
+
+function hasServiceRouting(appsPath: string): boolean {
+  if (!existsSync(appsPath)) return false;
+  try {
+    const apps = JSON.parse(readFileSync(appsPath, 'utf8')) as { primary?: unknown };
+    return !Array.isArray(apps) && Array.isArray(apps.primary) && apps.primary.length > 0;
+  } catch {
+    // A malformed real route should be surfaced by resolveServiceTargets.
+    return true;
   }
 }
 
@@ -250,6 +258,29 @@ function stringList(value: unknown, field: string): string[] {
     throw new Error(`apps.json.${field} must be a list of service names`);
   }
   return value.map((item) => item.trim());
+}
+
+async function runTechDesign(
+  state: ExecutionState,
+  inv: FeatureDevInvocation,
+  deps: RunnerDeps
+): Promise<PhaseResult> {
+  const result = await makeRunner('tech-design')(state, inv, deps);
+  if (result.status !== 'pass' && result.status !== 'warn') return result;
+  try {
+    const targets = resolveServiceTargets(inv.projectRoot, state.featureDir);
+    validateFeatureMap(state.featureDir, targets);
+    return result;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      ...result,
+      status: 'failed',
+      summary: `${result.summary}（功能点服务映射校验失败）`,
+      evidence: [...result.evidence, `feature_map_invalid:${detail}`],
+      blocker: `请修复 feature-map.json 后重新生成技术方案：${detail}`,
+    };
+  }
 }
 
 /** Build a phase.run that invokes the named subagent. */

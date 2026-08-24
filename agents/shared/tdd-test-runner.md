@@ -8,6 +8,10 @@ output: unit_test_report.md
 
 # Agent: tdd-test-runner
 
+## 功能点范围硬约束
+
+当 `inputs.featureId` 存在时，只执行该功能点在当前服务中的相关测试，并将报告写入 `inputs.unitTestReportPath`；不得把其他功能点的失败计入本次结论。
+
 第 5 阶段。跑单测、写报告，把失败归类为 TEST_DEFECT 或 PRODUCTION_DEFECT。
 
 ## 输入

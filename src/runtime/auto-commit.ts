@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process';
 import type { AutoCommitResult, WorkflowId } from '../types/contracts.js';
 import { resolveServiceTargets } from './service-targets.js';
+import { selectFeatureTargets } from './feature-map.js';
 
 export interface AutoCommitInput {
   cwd: string;
@@ -65,12 +66,13 @@ export function autoCommitAndPush(
 
 /** Commit and push every writable service for a multi-service plan or TDD run. */
 export function autoCommitAndPushServices(
-  input: AutoCommitInput & { projectRoot: string },
+  input: AutoCommitInput & { projectRoot: string; featureId?: string },
   git: GitCommandRunner = systemGit
 ): AutoCommitResult {
   let targets;
   try {
-    targets = resolveServiceTargets(input.projectRoot, input.cwd);
+    const allTargets = resolveServiceTargets(input.projectRoot, input.cwd);
+    targets = selectFeatureTargets(input.cwd, allTargets, input.featureId).targets;
   } catch (error) {
     return { status: 'commit_failed', error: errorMessage(error) };
   }

@@ -150,11 +150,15 @@ export function validateFeatureDir(featureDir: string, projectRoot: string): str
 }
 
 export function isInside(child: string, parent: string): boolean {
-  const c = resolve(child);
-  const p = resolve(parent);
+  const c = comparablePath(resolve(child));
+  const p = comparablePath(resolve(parent));
   if (c === p) return true;
   const prefix = p.endsWith(sep) ? p : p + sep;
   return c.startsWith(prefix);
+}
+
+function comparablePath(path: string): string {
+  return process.platform === 'win32' ? path.toLowerCase() : path;
 }
 
 /**

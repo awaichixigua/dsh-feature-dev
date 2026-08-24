@@ -6,8 +6,9 @@ model_role: review
 output: code-review.md
 ---
 
-<!-- When inputs.featureId is present, review only inputs.feature in the
-current service and write the report to inputs.codeReviewPath. -->
+## 功能点范围硬约束
+
+当 `inputs.featureId` 存在时，只审查 `inputs.feature` 在当前服务中的实现，并将报告写入 `inputs.codeReviewPath`。
 
 # Agent: code-review
 

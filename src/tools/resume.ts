@@ -183,8 +183,16 @@ export async function resumeFeatureDev(
 function autoCommitForWorkflow(state: import('../types/contracts.js').ExecutionState): AutoCommitResult {
   const input = { cwd: state.featureDir, workflow: state.workflow as Extract<WorkflowId, 'implementation-plan' | 'code-gen-tdd' | 'bugfix'>, runId: state.runId };
   return state.workflow === 'implementation-plan' || state.workflow === 'code-gen-tdd'
-    ? autoCommitAndPushServices({ ...input, projectRoot: state.projectRoot })
+    ? autoCommitAndPushServices({
+        ...input,
+        projectRoot: state.projectRoot,
+        ...(state.workflow === 'code-gen-tdd' && isFeaturePointId(state.featureId) ? { featureId: state.featureId } : {}),
+      })
     : autoCommitAndPush(input);
+}
+
+function isFeaturePointId(value: string | undefined): value is string {
+  return typeof value === 'string' && /^F-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value);
 }
 
 function shouldAutoCommit(state: import('../types/contracts.js').ExecutionState): boolean {
