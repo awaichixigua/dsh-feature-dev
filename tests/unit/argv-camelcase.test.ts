@@ -41,6 +41,12 @@ void test('implementation-plan positional text becomes a direct requirement', ()
   assert.equal(r.rawUserRequest, '支持按订单编号查询物流状态');
 });
 
+void test('mrd-to-code positional text becomes a direct requirement', () => {
+  const r = parseToolArgv('支持按订单编号查询物流状态 --feature-dir req/query-logistics', 'mrd-to-code');
+  assert.equal(r.workflow, 'mrd-to-code');
+  assert.equal(r.rawUserRequest, '支持按订单编号查询物流状态');
+});
+
 void test('empty argv + defaultWorkflow seeds workflow', () => {
   const r = parseToolArgv('', 'code-gen-tdd');
   assert.equal(r.workflow, 'code-gen-tdd');

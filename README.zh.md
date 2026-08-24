@@ -19,7 +19,7 @@
 dsh plugin --profile web add D:\ai\dsh-feature-dev
 
 # npm 安装(发布后)
-dsh plugin --profile web add @your-org/dsh-feature-dev
+dsh plugin --profile web add @engios/dsh-feature-dev
 
 # 验证
 dsh --profile web --dump-config

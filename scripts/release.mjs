@@ -1,21 +1,10 @@
 #!/usr/bin/env node
-// scripts/release.mjs
-// One-click release: bump version → build → smoke test → commit → tag → push.
+// One-click release: validate -> bump version -> commit -> tag -> push.
 //
-// Usage:
-//   pnpm release                 # patch bump (0.1.1 → 0.1.2)
-//   pnpm release:minor           # minor bump (0.1.1 → 0.2.0)
-//   pnpm release:major           # major bump (0.1.1 → 1.0.0)
-//
-// Prerequisites:
-//   - Clean working tree (no uncommitted changes).
-//   - Remote `origin` pointing to the GitLab repo.
-//   - pnpm available; pnpm build / pnpm test:package will run.
-//
-// After this script finishes, users can install the new version via:
-//   dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v<NEW_VERSION>
+// Releases are intentionally limited to the protected master branch so a
+// version tag can never be created from an unmerged feature branch.
 
-import { execSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -23,58 +12,92 @@ import path from 'node:path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PKG_PATH = path.join(ROOT, 'package.json');
+const RELEASE_BRANCH = 'master';
 
 const bump = process.argv[2] || 'patch';
 if (!['patch', 'minor', 'major'].includes(bump)) {
-  console.error(`❌ Invalid bump type: ${bump}`);
-  console.error(`   Usage: pnpm release [patch|minor|major]`);
+  console.error(`Invalid bump type: ${bump}`);
+  console.error('Usage: pnpm release [patch|minor|major]');
   process.exit(1);
 }
 
-const run = (cmd, opts = {}) => {
-  console.log(`\n› ${cmd}`);
-  try {
-    execSync(cmd, { stdio: 'inherit', cwd: ROOT, ...opts });
-  } catch {
-    console.error(`\n❌ Command failed: ${cmd}`);
-    process.exit(1);
+function run(command, args) {
+  console.log(`\n> ${command} ${args.join(' ')}`);
+  execFileSync(command, args, { stdio: 'inherit', cwd: ROOT });
+}
+
+function readCommand(command, args) {
+  return execFileSync(command, args, { encoding: 'utf8', cwd: ROOT }).trim();
+}
+
+function hasTag(tag) {
+  return spawnSync('git', ['rev-parse', '--quiet', '--verify', `refs/tags/${tag}`], {
+    cwd: ROOT,
+    stdio: 'ignore',
+  }).status === 0;
+}
+
+const packageText = readFileSync(PKG_PATH, 'utf8');
+let versionWasWritten = false;
+let releaseWasCommitted = false;
+
+try {
+  const status = readCommand('git', ['status', '--porcelain']);
+  if (status) {
+    throw new Error(`Working tree is dirty. Commit or stash first:\n${status}`);
   }
-};
 
-// 1. Pre-flight: clean tree.
-const status = execSync('git status --porcelain', { encoding: 'utf8', cwd: ROOT });
-if (status.trim()) {
-  console.error('❌ Working tree is dirty. Commit or stash first:\n');
-  console.error(status);
+  const branch = readCommand('git', ['branch', '--show-current']);
+  if (branch !== RELEASE_BRANCH) {
+    throw new Error(`Releases must run from ${RELEASE_BRANCH}; current branch is ${branch || '(detached HEAD)'}.`);
+  }
+
+  const pkg = JSON.parse(packageText);
+  if (typeof pkg.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(pkg.version)) {
+    throw new Error(`package.json version must be stable semver (x.y.z), got ${JSON.stringify(pkg.version)}.`);
+  }
+
+  const [major, minor, patch] = pkg.version.split('.').map(Number);
+  const next =
+    bump === 'major' ? [major + 1, 0, 0]
+    : bump === 'minor' ? [major, minor + 1, 0]
+    : [major, minor, patch + 1];
+  const newVersion = next.join('.');
+  const tag = `v${newVersion}`;
+
+  if (hasTag(tag)) {
+    throw new Error(`Tag ${tag} already exists. Choose another version before releasing.`);
+  }
+
+  // Validate before changing tracked files, so test failures leave no dirty tree.
+  run('pnpm', ['build']);
+  run('pnpm', ['test:package']);
+
+  pkg.version = newVersion;
+  writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
+  versionWasWritten = true;
+  console.log(`\nBumped version: ${major}.${minor}.${patch} -> ${newVersion}`);
+
+  run('git', ['add', '--', 'package.json']);
+  run('git', ['commit', '-m', `chore(release): ${tag}`]);
+  releaseWasCommitted = true;
+  run('git', ['tag', '-a', tag, '-m', `Release ${tag}`]);
+  run('git', ['push', 'origin', `HEAD:refs/heads/${RELEASE_BRANCH}`]);
+  run('git', ['push', 'origin', tag]);
+
+  const repoUrl = pkg.repository?.url?.replace(/\.git$/, '') ?? '';
+  console.log(`\nReleased ${tag}`);
+  if (repoUrl) {
+    console.log(`Install: dsh plugin --profile web add ${repoUrl}.git#${tag}`);
+  }
+} catch (error) {
+  if (versionWasWritten && !releaseWasCommitted) {
+    writeFileSync(PKG_PATH, packageText);
+    spawnSync('git', ['restore', '--staged', '--', 'package.json'], { cwd: ROOT, stdio: 'ignore' });
+    console.error('\nRelease failed before commit; package.json has been restored.');
+  } else if (releaseWasCommitted) {
+    console.error('\nRelease failed after the release commit was created. Inspect the local commit and tag before retrying.');
+  }
+  console.error(`\nRelease failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
-}
-
-// 2. Bump version in package.json.
-const pkg = JSON.parse(readFileSync(PKG_PATH, 'utf8'));
-const [a, b, c] = pkg.version.split('.').map(Number);
-const next =
-  bump === 'major' ? [a + 1, 0, 0]
-  : bump === 'minor' ? [a, b + 1, 0]
-  : [a, b, c + 1];
-const newVer = next.join('.');
-pkg.version = newVer;
-writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
-console.log(`📦 Bumped version: ${pkg.version} → ${newVer}`);
-
-// 3. Build + smoke test.
-run('pnpm build');
-run('pnpm test:package');
-
-// 4. Commit, tag, push.
-run('git add package.json');
-run(`git commit -m "chore(release): v${newVer}"`);
-run(`git tag v${newVer}`);
-run('git push origin HEAD');
-run(`git push origin v${newVer}`);
-
-const repoUrl = pkg.repository?.url?.replace(/\.git$/, '') ?? '';
-console.log(`\n✅ Released v${newVer}`);
-if (repoUrl) {
-  console.log(`\n📥 Users can now install:`);
-  console.log(`   dsh plugin --profile web add ${repoUrl}.git#v${newVer}`);
 }

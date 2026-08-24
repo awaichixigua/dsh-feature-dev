@@ -164,9 +164,9 @@ function applyTokens(out: NormalizeInput, tokens: readonly string[]): void {
       } else if (/^https?:\/\//.test(t) || t.includes('share_doc') || t.endsWith('.md')) {
         out.mrdUrl = t;
         out.workflow = 'implementation-plan';
-      } else if (out.workflow === 'implementation-plan') {
-        // In the implementation-plan skill, a non-URL positional argument
-        // is the requirement itself, not a bug description.
+      } else if (out.workflow === 'implementation-plan' || out.workflow === 'mrd-to-code') {
+        // Planning workflow positional text is the requirement itself, not a
+        // bug description.
         out.rawUserRequest = [out.rawUserRequest, t].filter(Boolean).join(' ');
       } else {
         // Treat as bug description

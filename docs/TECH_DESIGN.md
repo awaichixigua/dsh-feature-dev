@@ -236,7 +236,7 @@ D:\ai\dsh-feature-dev\
 
 ```json
 {
-  "name": "@your-org/dsh-feature-dev",
+  "name": "@engios/dsh-feature-dev",
   "version": "0.1.0",
   "description": "Native MRD-to-code workflow bundle for DeepSeek Harness",
   "type": "module",
@@ -274,7 +274,7 @@ DeepSeek Harness 处于 Developer Preview。开发和发布必须锁定已验证
 ```yaml
 - insert:
     - id: dsh-feature-dev
-      name: '@your-org/dsh-feature-dev'
+      name: '@engios/dsh-feature-dev'
       config:
         defaultWorkflow: code-gen-tdd
         subagentProvider: spawn
@@ -647,7 +647,7 @@ dsh plugin --profile web add D:\ai\dsh-feature-dev
 ### 17.2 npm
 
 ```powershell
-dsh plugin --profile web add @your-org/dsh-feature-dev
+dsh plugin --profile web add @engios/dsh-feature-dev
 ```
 
 ### 17.3 验证

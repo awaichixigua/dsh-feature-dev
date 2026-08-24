@@ -39,7 +39,7 @@ DSH 处于 **Developer Preview** 阶段,公共 API 可能会变。本文档记�
 ```yaml
 - insert:
     - id: dsh-feature-dev
-      name: '@your-org/dsh-feature-dev'
+      name: '@engios/dsh-feature-dev'
       config:
         defaultWorkflow: code-gen-tdd
         subagentProvider: spawn

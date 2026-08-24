@@ -22,7 +22,7 @@ package** that does not depend on or modify the original Claude-only
 dsh plugin --profile web add D:\ai\dsh-feature-dev
 
 # npm install (once published)
-dsh plugin --profile web add @your-org/dsh-feature-dev
+dsh plugin --profile web add @engios/dsh-feature-dev
 
 # verify
 dsh --profile web --dump-config

@@ -23,15 +23,29 @@ void test('normalizeInvocation: rejects unknown workflow', () => {
   );
 });
 
-void test('normalizeInvocation: requires mrdUrl for mrd-to-code', () => {
+void test('normalizeInvocation: requires a source for mrd-to-code', () => {
   assert.throws(
     () =>
       normalizeInvocation(
         { workflow: 'mrd-to-code' },
         { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'mrd-to-code' }
       ),
-    /mrd-to-code requires mrdUrl/
+    /mrd-to-code requires mrdUrl or rawUserRequest/
   );
+});
+
+void test('normalizeInvocation: mrd-to-code accepts direct requirement without mrdUrl', () => {
+  const inv = normalizeInvocation(
+    {
+      workflow: 'mrd-to-code',
+      projectRoot: process.cwd(),
+      featureDir: process.cwd(),
+      rawUserRequest: '支持按订单编号查询物流状态',
+    },
+    { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'mrd-to-code' }
+  );
+  assert.equal(inv.mrdUrl, undefined);
+  assert.equal(inv.rawUserRequest, '支持按订单编号查询物流状态');
 });
 
 void test('normalizeInvocation: requires bugDescription for bugfix', () => {
@@ -136,6 +150,13 @@ void test('parseSkillArgv: extracts clarify-mode', () => {
 void test('parseSkillArgv: accepts inline implementation-plan requirement', () => {
   const r = parseSkillArgv('implementation-plan "支持按订单编号查询物流状态" --feature-dir req/query-logistics');
   assert.equal(r.workflow, 'implementation-plan');
+  assert.equal(r.mrdUrl, undefined);
+  assert.equal(r.rawUserRequest, '支持按订单编号查询物流状态');
+});
+
+void test('parseSkillArgv: accepts inline mrd-to-code requirement', () => {
+  const r = parseSkillArgv('mrd-to-code "支持按订单编号查询物流状态" --feature-dir req/query-logistics');
+  assert.equal(r.workflow, 'mrd-to-code');
   assert.equal(r.mrdUrl, undefined);
   assert.equal(r.rawUserRequest, '支持按订单编号查询物流状态');
 });

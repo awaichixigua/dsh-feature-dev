@@ -60,17 +60,52 @@ http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git
 
 ### 2.1 用户侧安装
 
+Git 依赖需要在目标 DSH profile 中显式批准构建脚本；否则 pnpm 会下载包但拦截
+`prepare`，导致 `lib/` 未生成。每个 profile 只需配置一次。尚未使用过该 profile 时，
+先初始化其目录：
+
+```powershell
+# web profile；headless 请把 web 换成 headless
+dsh plugin --profile web install
+```
+
+然后编辑该 profile 的配置：
+
+```powershell
+$workspace = Join-Path $env:USERPROFILE '.dsh\profiles\web\pnpm-workspace.yaml'
+notepad $workspace
+```
+
+在 `allowBuilds:` 下加入（保留文件中已有的条目）：
+
+```yaml
+allowBuilds:
+  '@engios/dsh-feature-dev': true
+```
+
+然后再安装。pnpm 若提示的构建包名与此不同，以其提示为准。
+
 ```powershell
 # 最新版本
 dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git
 
 # 指定版本（推荐，便于回滚与回归）
-dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v0.1.1
+dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v<version>
 ```
 
-> 安装时 dsh CLI 会在本地执行 `git clone` → `pnpm install` → 触发 `prepare` 钩子现场编译 `lib/`，最后由 Cordis 加载 `lib/index.js`。
+> 安装时 dsh CLI 会在本地执行 `git clone` → `pnpm install` → 触发已批准的 `prepare` 钩子现场编译 `lib/`，最后由 Cordis 加载 `lib/index.js`。
 
-### 2.2 维护者侧一次配置
+### 2.2 从旧包名迁移
+
+曾安装过占位包名 `@your-org/dsh-feature-dev` 的 profile，必须先移除旧依赖再安装新包名，
+否则 DSH 会把两个包都作为 bundle 加载：
+
+```powershell
+dsh plugin --profile web remove @your-org/dsh-feature-dev
+dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v<version>
+```
+
+### 2.3 维护者侧一次配置
 
 只需一次，确保 `package.json` 里有以下字段（当前仓库已配置好）：
 
@@ -89,7 +124,7 @@ dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-fe
 
 并保持 `cordis.patch.yml` 中的插件名与 `package.json#name` **严格一致**。
 
-### 2.3 一键发版
+### 2.4 一键发版
 
 ```powershell
 # 修订号 +1 (0.1.1 → 0.1.2)
@@ -104,20 +139,20 @@ pnpm release:major
 
 脚本会自动完成：
 
-1. 检查工作区干净（避免误带脏文件）
-2. 更新 `package.json#version`
-3. 跑 `pnpm build` + `pnpm test:package`（冒烟测试）
+1. 检查工作区干净，并确认当前分支为 `master`
+2. 先跑 `pnpm build` + `pnpm test:package`（冒烟测试）
+3. 更新 `package.json#version`；若提交前失败会自动恢复该文件
 4. `git add package.json` → `git commit`
-5. 打 tag（如 `v0.1.2`）→ `git push origin HEAD` + `git push origin v0.1.2`
+5. 打 annotated tag（如 `v0.1.2`）→ 推送 `master` 和 tag
 6. 打印新版本的安装命令
 
-### 2.4 GitLab 私服的坑
+### 2.5 GitLab 私服的坑
 
 | 场景 | 风险 | 怎么避 |
 | --- | --- | --- |
 | 自建 GitLab 启用了 SSO / 2FA | 匿名克隆 401 | 用 Personal Access Token，URL 写成 `https://oauth2:<TOKEN>@gitlab.iheatingos.com:8083/...`；或配 SSH 部署密钥用 `git+ssh://git@...` 形式 |
-| `prepare` 钩子没装 | 拉下来 `lib/` 空，插件加载失败 | 确认 `package.json` 里有 `"prepare": "pnpm build"` |
-| 没打 tag | 默认拉 `main` 分支，版本不可控 | 必须用 `pnpm release:*` 或手动 `git tag v0.1.1 && git push origin v0.1.1`，安装时用 `#v0.1.1` 锁版本 |
+| `prepare` 被 pnpm 拦截 | 拉下来 `lib/` 空，插件加载失败 | 在目标 profile 的 `pnpm-workspace.yaml` 中将 `@engios/dsh-feature-dev` 加入 `allowBuilds` |
+| 没打 tag | 默认拉远端默认分支，版本不可控 | 必须用 `pnpm release:*` 或手动打 tag，安装时用 `#v<version>` 锁版本 |
 | 私有仓库 + 公网用户 | 对方克隆被拒 | 仓库设为 group 内可见，或改走 npm 私服（Verdaccio） |
 
 ---
@@ -137,10 +172,10 @@ pnpm pack
 把生成的 `.tgz` 文件发给对方，安装命令：
 
 ```powershell
-dsh plugin --profile web add D:\packages\engios-dsh-feature-dev-0.1.1.tgz
+dsh plugin --profile web add D:\packages\engios-dsh-feature-dev-<version>.tgz
 ```
 
-> 把路径里的 `engios-dsh-feature-dev-0.1.1.tgz` 替换成实际生成的文件名（pnpm pack 出来的文件名格式是 `<name>-<version>.tgz`）。
+> 把路径里的 `engios-dsh-feature-dev-<version>.tgz` 替换成实际生成的文件名（pnpm pack 出来的文件名格式是 `<name>-<version>.tgz`）。
 
 ---
 
@@ -186,7 +221,7 @@ npm publish --registry https://你的npm私服地址
 ### 4.3 安装已发布的版本
 
 ```powershell
-dsh plugin --profile web add @engios/dsh-feature-dev@0.1.1
+dsh plugin --profile web add @engios/dsh-feature-dev@<version>
 dsh --profile web --dump-config
 ```
 
@@ -226,7 +261,7 @@ dsh plugin --profile web add @engios/dsh-feature-dev@latest
 | 阶段 | 推荐方式 | 命令 |
 | --- | --- | --- |
 | **本机验证** | 方式一：本地安装 | `dsh plugin --profile web add D:\ai\dsh-feature-dev` |
-| **团队内分发** | 方式二：GitLab `git+URL` | `dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v0.1.1` |
+| **团队内分发** | 方式二：GitLab `git+URL` | `dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v<version>` |
 | **临时一次性发包** | 方式三：`.tgz` 分发 | `dsh plugin --profile web add <file>.tgz` |
 | **正式对外发布** | 方式四：发布到 npm | `dsh plugin --profile web add @engios/dsh-feature-dev@<version>` |
 

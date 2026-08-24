@@ -154,6 +154,29 @@ void test('implementation-plan accepts direct requirement input without fetching
   }
 });
 
+void test('mrd-to-code accepts direct requirement input without fetching MRDoc', async () => {
+  const project = makeProject();
+  try {
+    const featureDir = join(project, 'req', 'direct-mrd-to-code-test');
+    const requirement = '支持按订单编号查询物流状态，并展示最新物流节点';
+    const run = await runFeatureDev(
+      { packageRoot: PKG_ROOT, importMetaUrl: import.meta.url },
+      {
+        workflow: 'mrd-to-code',
+        projectRoot: project,
+        featureDir,
+        rawUserRequest: requirement,
+        options: { resume: false, unitTests: false, generateUnitTestsOnly: false },
+      }
+    );
+    assert.equal(run.ok, true, JSON.stringify(run, null, 2));
+    if (!run.ok) return;
+    assert.match(readFileSync(join(run.data.featureDir, 'mrd-original.md'), 'utf8'), new RegExp(requirement));
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+  }
+});
+
 void test('state.json contains all expected top-level fields', async () => {
   const project = makeProject();
   try {

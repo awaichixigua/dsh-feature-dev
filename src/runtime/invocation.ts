@@ -98,8 +98,8 @@ export function normalizeInvocation(
   }
 
   // Workflow-specific cross-field checks
-  if (workflow === 'mrd-to-code' && !input.mrdUrl) {
-    throw new ValidationError('mrd-to-code requires mrdUrl', { workflow });
+  if (workflow === 'mrd-to-code' && !input.mrdUrl && !input.rawUserRequest?.trim()) {
+    throw new ValidationError('mrd-to-code requires mrdUrl or rawUserRequest', { workflow });
   }
   if (workflow === 'bugfix' && !input.bugDescription) {
     throw new ValidationError('bugfix requires bugDescription', { workflow });
@@ -227,12 +227,12 @@ export function parseSkillArgv(argv: string): NormalizeInput {
       out.bugDescription = first;
     }
   }
-  if (out.workflow === 'implementation-plan' && !out.mrdUrl) {
-    // The implementation-plan skill accepts the positional text as an
-    // inline requirement. This is intentionally kept as one string so the
-    // workflow can persist it verbatim as its source artifact.
+  if ((out.workflow === 'implementation-plan' || out.workflow === 'mrd-to-code') && !out.mrdUrl) {
+    // Planning workflows accept positional text as an inline requirement.
+    // This is intentionally kept as one string so the workflow can persist
+    // it verbatim as its source artifact.
     out.rawUserRequest = positional
-      .filter((item) => item.toLowerCase() !== 'implementation-plan')
+      .filter((item) => item.toLowerCase() !== 'implementation-plan' && item.toLowerCase() !== 'mrd-to-code')
       .join(' ');
   } else if (positional.length > 1) {
     out.rawUserRequest = positional.slice(1).join(' ');
