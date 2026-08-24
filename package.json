@@ -1,5 +1,5 @@
 {
-  "name": "@your-org/dsh-feature-dev",
+  "name": "@engios/dsh-feature-dev",
   "version": "0.1.1",
   "description": "Native MRD-to-code workflow bundle for DeepSeek Harness",
   "type": "module",
@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepare": "pnpm build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ tests/",
     "test": "node --test --import tsx tests/unit/*.test.ts tests/contract/*.test.ts",
@@ -33,8 +34,20 @@
     "test:scan": "node --import tsx scripts/scan-claude-keywords.ts",
     "test:package": "node --import tsx scripts/verify-package.ts",
     "verify:dsh": "node --import tsx scripts/verify-dsh-versions.ts",
-    "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('lib',{recursive:true,force:true}))\""
+    "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('lib',{recursive:true,force:true}))\"",
+    "release": "node scripts/release.mjs",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major"
   },
+  "repository": {
+    "type": "git",
+    "url": "http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git"
+  },
+  "bugs": {
+    "url": "http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev/-/issues"
+  },
+  "homepage": "http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev#readme",
   "engines": {
     "node": ">=22.0.0"
   },

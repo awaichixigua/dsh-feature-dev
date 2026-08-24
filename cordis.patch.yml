@@ -1,6 +1,6 @@
 - insert:
     - id: dsh-feature-dev
-      name: '@your-org/dsh-feature-dev'
+      name: '@engios/dsh-feature-dev'
       config:
         defaultWorkflow: code-gen-tdd
         subagentProvider: spawn
