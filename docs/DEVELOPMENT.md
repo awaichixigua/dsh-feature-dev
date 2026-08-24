@@ -1,6 +1,6 @@
 # Development Guide
 
-本指南对应 `dsh-feature-dev` 0.1.4。工作流状态、门禁和子代理输出均由 runtime 约束；改动不能只修改 Skill 文案。
+本指南对应 `dsh-feature-dev` 0.1.5。工作流状态、门禁和子代理输出均由 runtime 约束；改动不能只修改 Skill 文案。
 
 ## 项目结构
 

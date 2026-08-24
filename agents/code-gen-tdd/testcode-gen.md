@@ -6,6 +6,9 @@ model_role: coding
 output: test files
 ---
 
+<!-- When inputs.featureId is present, generate only the tests for
+inputs.feature in the current service, using inputs.testSpecPath. -->
+
 # Agent: testcode-gen
 
 第 4 阶段。从 `test_spec.md` 生成单测代码。当 `options.unitTests=false` 时跳过。

@@ -20,7 +20,7 @@ import type { DshContext } from '../dsh/context.js';
 import type { Agent } from '../dsh/sdk.js';
 import { Lifecycle } from '../runtime/lifecycle.js';
 import { RunMetricsReporter } from '../metrics/reporter.js';
-import { autoCommitAndPush } from '../runtime/auto-commit.js';
+import { autoCommitAndPush, autoCommitAndPushServices } from '../runtime/auto-commit.js';
 
 export interface ResumeArgs {
   projectRoot: string;
@@ -161,7 +161,7 @@ export async function resumeFeatureDev(
     });
     await lifecycle.onRunEnd(final);
     const autoCommit = shouldAutoCommit(final) && isAutoCommitWorkflow(final.workflow)
-      ? autoCommitAndPush({ cwd: final.featureDir, workflow: final.workflow, runId: final.runId })
+      ? autoCommitForWorkflow(final)
       : undefined;
     return ok({
       runId: final.runId,
@@ -178,6 +178,13 @@ export async function resumeFeatureDev(
   } catch (e) {
     return fail(e);
   }
+}
+
+function autoCommitForWorkflow(state: import('../types/contracts.js').ExecutionState): AutoCommitResult {
+  const input = { cwd: state.featureDir, workflow: state.workflow as Extract<WorkflowId, 'implementation-plan' | 'code-gen-tdd' | 'bugfix'>, runId: state.runId };
+  return state.workflow === 'implementation-plan' || state.workflow === 'code-gen-tdd'
+    ? autoCommitAndPushServices({ ...input, projectRoot: state.projectRoot })
+    : autoCommitAndPush(input);
 }
 
 function shouldAutoCommit(state: import('../types/contracts.js').ExecutionState): boolean {

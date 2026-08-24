@@ -6,6 +6,10 @@ model_role: coding
 output: source files
 ---
 
+<!-- When inputs.featureId is present, implement only inputs.feature in the
+current service. Its service membership and acceptance criteria are authoritative;
+do not implement unrelated feature points. -->
+
 # Agent: code-impl
 
 code-gen-tdd 流程的第 2 阶段。读 `test_spec.md`，在项目内写出实现代码。

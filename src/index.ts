@@ -25,7 +25,7 @@ import { narrowContext, type DshContext } from './dsh/context.js';
 import type { WorkflowId } from './types/contracts.js';
 
 export const name = 'dsh-feature-dev';
-export const version = '0.1.4';
+export const version = '0.1.5';
 
 /** Runtime services this plugin actually waits for before activation. */
 export const inject = ['skills', 'tools', 'subagents', 'systemPrompt'] as const;

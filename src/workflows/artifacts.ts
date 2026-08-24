@@ -21,6 +21,7 @@ export function getArtifactsForWorkflow(
         { path: `${featureDir}/mrd-original.md`, minSize: 1 },
         { path: `${featureDir}/prd.md`, minSize: 200, mustContain: ['# '] },
         { path: `${featureDir}/tech-design.md`, minSize: 200, mustContain: ['# '] },
+        { path: `${featureDir}/feature-map.json`, minSize: 80, json: true },
       ];
     case 'code-gen-tdd':
       return [

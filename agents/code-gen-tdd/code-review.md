@@ -6,6 +6,9 @@ model_role: review
 output: code-review.md
 ---
 
+<!-- When inputs.featureId is present, review only inputs.feature in the
+current service and write the report to inputs.codeReviewPath. -->
+
 # Agent: code-review
 
 第 3 阶段。对照 `test_spec.md` 和 `tech-design.md` 审查 `git diff`，范围是 `git diff` 的 "+" 行。

@@ -28,10 +28,12 @@ import type { RunnerDeps } from './runner.js';
 import { assertTransition, nextPhaseFromResult } from '../runtime/state-machine.js';
 import { validateArtifacts, type ArtifactSpec } from '../runtime/artifact-validator.js';
 import { GateEngine, type Gate } from '../runtime/gate-engine.js';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { resolveServiceKbContextPath } from '../runtime/paths.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { runPhaseSubagent } from './subagent-runner.js';
+import { resolveServiceTargets, type ServiceTarget } from '../runtime/service-targets.js';
+import { selectFeatureTargets, type FeatureMapEntry } from '../runtime/feature-map.js';
 
 interface PhaseDef {
   name: string;
@@ -48,10 +50,15 @@ export async function codeGenTdd(
 ): Promise<ExecutionState> {
   const engine = new GateEngine(deps.repo, deps.config.strictGates);
   const featureDir = inv.featureDir ?? inv.projectRoot;
+  // State persistence uses featureId for the requirement directory as well.
+  // Only F-xxx values are explicit, individually executable feature points.
+  const selectedFeatureId = resolveSelectedFeatureId(inv.featureId, featureDir);
+  const selection = selectFeatureTargets(featureDir, resolveServiceTargets(inv.projectRoot, featureDir), selectedFeatureId);
+  const targets = selection.targets;
   const phases: PhaseDef[] = [
     {
       name: 'PHASE1_TEST_SPEC',
-      artifacts: [{ path: `${featureDir}/ai/test_spec.md`, minSize: 100, mustContain: ['# '] }],
+      artifacts: targets.map((target) => ({ path: featureArtifactPath(target, selectedFeatureId, 'test_spec.md'), minSize: 100, mustContain: ['# '] })),
       gate: 'post_test_spec',
       subagent: 'tdd-test-spec',
     },
@@ -62,7 +69,7 @@ export async function codeGenTdd(
     },
     {
       name: 'PHASE3_REVIEW',
-      artifacts: [{ path: `${featureDir}/ai/code-review.md`, minSize: 100 }],
+      artifacts: targets.map((target) => ({ path: featureArtifactPath(target, selectedFeatureId, 'code-review.md'), minSize: 100 })),
       subagent: 'code-review',
     },
     {
@@ -72,7 +79,7 @@ export async function codeGenTdd(
     },
     {
       name: 'PHASE5_TEST_EXECUTION',
-      artifacts: [{ path: `${featureDir}/ai/unit_test_report.md`, minSize: 100 }],
+      artifacts: targets.map((target) => ({ path: featureArtifactPath(target, selectedFeatureId, 'unit_test_report.md'), minSize: 100 })),
       subagent: 'tdd-test-runner',
     },
     {
@@ -94,7 +101,7 @@ export async function codeGenTdd(
     },
   ];
 
-  return driveTdd(state, inv, deps, engine, phases, featureDir);
+  return driveTdd(state, inv, deps, engine, phases, targets, selectedFeatureId, selection.feature, selection.featureMapPath);
 }
 
 async function driveTdd(
@@ -103,7 +110,10 @@ async function driveTdd(
   deps: RunnerDeps,
   engine: GateEngine,
   phases: PhaseDef[],
-  _featureDir: string
+  targets: ServiceTarget[],
+  selectedFeatureId: string | undefined,
+  feature?: FeatureMapEntry,
+  featureMapPath?: string
 ): Promise<ExecutionState> {
   let safetyBudget = 50;
   while (safetyBudget-- > 0) {
@@ -160,7 +170,7 @@ async function driveTdd(
     }
     deps.repo.beginPhase(state, def.name);
     deps.lifecycle?.onPhaseStart(state, def.name);
-    const result = await runSubagentPhase(state, inv, deps, def);
+    const result = await runSubagentPhase(state, inv, deps, def, targets, selectedFeatureId, feature, featureMapPath);
     const valid = validateArtifacts(inv.projectRoot, def.artifacts);
     if (!valid.ok && def.artifacts.length > 0) {
       const failures = valid.results.filter((r) => !r.ok);
@@ -230,25 +240,52 @@ async function runSubagentPhase(
   state: ExecutionState,
   inv: FeatureDevInvocation,
   deps: RunnerDeps,
-  def: PhaseDef
+  def: PhaseDef,
+  targets: ServiceTarget[],
+  selectedFeatureId: string | undefined,
+  feature?: FeatureMapEntry,
+  featureMapPath?: string
+): Promise<PhaseResult> {
+  const results: PhaseResult[] = [];
+  for (const target of targets) {
+    results.push(await runSubagentForTarget(state, inv, deps, def, target, selectedFeatureId, feature, featureMapPath));
+  }
+  return combineTargetResults(results);
+}
+
+async function runSubagentForTarget(
+  state: ExecutionState,
+  inv: FeatureDevInvocation,
+  deps: RunnerDeps,
+  def: PhaseDef,
+  target: ServiceTarget,
+  selectedFeatureId: string | undefined,
+  feature?: FeatureMapEntry,
+  featureMapPath?: string
 ): Promise<PhaseResult> {
   // Build the PhaseRequest
   const promptPath = resolveAgentPromptPath(deps.ctx.packageRoot, 'code-gen-tdd', def.subagent);
   const kbContextPath = resolveServiceKbContextPath(
-    inv.featureDir ?? inv.projectRoot,
-    inv.projectRoot
+    target.featureDir,
+    target.projectRoot
   );
   const req: PhaseRequest = {
     runId: state.runId,
     workflow: 'code-gen-tdd',
     phase: def.name,
-    projectRoot: inv.projectRoot,
-    featureDir: inv.featureDir,
-    featureId: inv.featureId,
+    projectRoot: target.projectRoot,
+    featureDir: target.featureDir,
+    featureId: selectedFeatureId,
     promptPath,
     inputs: {
-      featureDir: inv.featureDir,
-      featureId: inv.featureId,
+      featureDir: target.featureDir,
+      featureId: selectedFeatureId,
+      service: target.service,
+      ...(feature ? { feature } : {}),
+      ...(featureMapPath ? { featureMapPath } : {}),
+      testSpecPath: featureArtifactPath(target, selectedFeatureId, 'test_spec.md'),
+      codeReviewPath: featureArtifactPath(target, selectedFeatureId, 'code-review.md'),
+      unitTestReportPath: featureArtifactPath(target, selectedFeatureId, 'unit_test_report.md'),
       workflow: inv.workflow,
       phase: def.name,
       mode: def.isRepair ? 'incremental-fix' : 'normal',
@@ -265,7 +302,9 @@ async function runSubagentPhase(
         lastPhaseResult: state.lastPhaseResult,
       },
     },
-    expectedArtifacts: def.artifacts.map((a) => a.path),
+    expectedArtifacts: def.artifacts
+      .filter((artifact) => artifact.path.startsWith(`${target.featureDir}/`))
+      .map((artifact) => artifact.path),
     mode: def.isRepair ? 'incremental-fix' : 'normal',
   };
   try {
@@ -281,6 +320,35 @@ async function runSubagentPhase(
       blocker: `请解决 ${def.subagent} 的子模型、提供方或运行时错误后再继续运行`,
     };
   }
+}
+
+function combineTargetResults(results: PhaseResult[]): PhaseResult {
+  const failed = results.find((result) => result.status === 'failed');
+  const blocked = results.find((result) => result.status === 'block');
+  const warned = results.some((result) => result.status === 'warn');
+  const selected = failed ?? blocked;
+  return {
+    status: selected?.status ?? (warned ? 'warn' : 'pass'),
+    summary: results.map((result) => result.summary).join('；'),
+    artifacts: results.flatMap((result) => result.artifacts),
+    evidence: results.flatMap((result) => result.evidence),
+    changedFiles: results.flatMap((result) => result.changedFiles),
+    ...(selected?.blocker ? { blocker: selected.blocker } : {}),
+  };
+}
+
+/** Feature-specific work keeps its artifacts separate from an all-feature run. */
+function featureArtifactPath(target: ServiceTarget, featureId: string | undefined, filename: string): string {
+  if (!featureId) return `${target.featureDir}/ai/${filename}`;
+  return `${target.featureDir}/ai/${featureId}/${filename}`;
+}
+
+function resolveSelectedFeatureId(value: string | undefined, featureDir: string): string | undefined {
+  if (!value || value === basename(featureDir)) return undefined;
+  if (!/^F-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
+    throw new Error(`--feature-id must use the F-<identifier> form: ${value}`);
+  }
+  return value;
 }
 
 export const _initial = 'INITIALIZED';

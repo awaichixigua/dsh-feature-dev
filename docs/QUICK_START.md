@@ -1,6 +1,6 @@
 # Quick Start
 
-本指南以当前 `dsh-feature-dev` 0.1.4 的 Skill、工具和状态机实现为准。它是面向业务 Git 仓库的 DSH 工作流 Bundle，不是业务项目本身。
+本指南以当前 `dsh-feature-dev` 0.1.5 的 Skill、工具和状态机实现为准。它是面向业务 Git 仓库的 DSH 工作流 Bundle，不是业务项目本身。
 
 ## 前置条件
 
@@ -90,6 +90,27 @@ flowchart TD
 
 `/implementation-plan` 只执行图中的规划部分，完成后再单独执行 `/code-gen-tdd`。`/archive` 也可以对已经实现的需求单独运行。
 
+多服务需求中，规划阶段会将 `prd.md`、`tech-design.md` 与 `feature-map.json` 同步到每个协作服务的 `req/<需求名>/`。技术方案必须包含“功能点 × 服务”矩阵；`feature-map.json` 是其可机器读取版本。随后 `/code-gen-tdd` 读取 `apps.json`，对每个主改和协作服务分别执行测试规格、实现、审查和可选测试阶段。
+
+使用 `--feature-id F-001` 时，`code-gen-tdd` 只执行 `feature-map.json` 中 F-001 所属的服务，并把测试规格、审查和测试报告写入 `ai/F-001/`；不传该参数则保持全需求、全服务执行。
+
+### 多服务目录定位
+
+相对 `--feature-dir` 只相对 `projectRoot` 解析，不会在主服务和协作服务中自动搜索同名目录。规划启动时可使用相对目录；服务路由完成后，主服务目录成为状态和 `apps.json` 的入口，协作服务目录由 `apps.json.repositories` 自动定位。因此继续 TDD、确认或恢复时，必须使用工具返回的主服务**绝对** `featureDir`，不要继续使用聚合根下的相对路径。
+
+例如 `projectRoot` 为 `D:\workspace`，`apps.json` 路由到 `D:\workspace\services\order`（主服务）和 `D:\workspace\services\payment`（协作服务）后，需求目录分别为：
+
+```text
+D:\workspace\services\order\req\2.0.0_103111_订单能力
+D:\workspace\services\payment\req\2.0.0_103111_订单能力
+```
+
+后续按功能点执行时，以主服务目录作为入口：
+
+```text
+/code-gen-tdd --project-root D:\workspace --feature-dir D:\workspace\services\order\req\2.0.0_103111_订单能力 --feature-id F-001
+```
+
 ## 最短路径：从需求到归档
 
 使用 MRD：
@@ -167,7 +188,7 @@ Bugfix 先运行只读的 `LOCATE`，定位成功后会自动进入对应分支�
 /bugfix --feature-dir req/2.0.0_103111_fastjson替换为jackson bug描述：支付失败后订单状态没有回滚 --auto-comit
 ```
 
-仅在工作流状态为 `completed` 时才执行。它会在 `featureDir` 所属 Git 仓库执行：
+仅在工作流状态为 `completed` 时才执行。单服务需求会在 `featureDir` 所属 Git 仓库执行；多服务的 `implementation-plan` 与 `code-gen-tdd` 会对每个可写服务仓库分别执行：
 
 ```text
 git add --all
@@ -175,7 +196,7 @@ git commit -m "feat(<workflow>): complete <runId>"
 git push
 ```
 
-因此会提交新增、修改和删除的文件，也会包含该仓库中其他尚未提交的工作区变更。使用前请确认工作区内容都应进入同一提交；没有改动时不会创建空提交。工具结果中的 `autoCommit.status` 会返回 `committed_and_pushed`、`no_changes`、`commit_failed` 或 `push_failed`。
+因此会提交新增、修改和删除的文件，也会包含各目标仓库中其他尚未提交的工作区变更。使用前请确认工作区内容都应进入同一提交；没有改动时不会创建空提交。工具结果中的 `autoCommit.status` 会返回 `committed_and_pushed`、`no_changes`、`commit_failed` 或 `push_failed`，多服务明细位于 `autoCommit.services`。
 
 ## 确认门、主会话操作与恢复
 
@@ -199,8 +220,8 @@ git push
 | 工作流 | 主要产物 |
 | --- | --- |
 | `knowledge-base` | `<projectRoot>/app-knowledge-base/CONTEXT.md` |
-| `implementation-plan` | `mrd-original.md`、`apps.json`、`prd.md`、`tech-design.md` |
-| `code-gen-tdd` | `ai/test_spec.md`、`ai/code-review.md`；启用测试时还包括 `ai/unit_test_report.md` |
+| `implementation-plan` | `mrd-original.md`、`apps.json`、`prd.md`、`tech-design.md`、`feature-map.json` |
+| `code-gen-tdd` | 全量执行时为 `ai/test_spec.md`、`ai/code-review.md`；指定功能点时为 `ai/F-xxx/` 下对应产物；启用测试时还包括测试报告 |
 | `bugfix` | `bugfix/<编号>-<简述>/bugfix-report.md` |
 | `archive` | `archive-report.md` |
 

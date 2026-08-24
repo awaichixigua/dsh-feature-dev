@@ -27,6 +27,7 @@ import { defaultRepoPathProbe, findDirectGitReposUnder, looksLikeGitRepository, 
 import { runPhaseSubagent } from './subagent-runner.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { prepareRequirementBranches } from './branch-gate.js';
+import { resolveServiceTargets } from '../runtime/service-targets.js';
 
 export async function implementationPlan(
   state: ExecutionState,
@@ -89,16 +90,44 @@ export async function implementationPlan(
       gate: 'pre_prd',
       subagent: 'prd-generator',
       run: makeRunner('prd-generator'),
+      afterPass: (current, currentInv) => syncPlanningArtifact(current, currentInv, 'prd.md'),
     },
     {
       name: 'TECH_DESIGN',
-      artifacts: (current) => [{ path: `${current.featureDir}/tech-design.md`, minSize: 200, mustContain: ['# ']}],
+      artifacts: (current) => [
+        { path: `${current.featureDir}/tech-design.md`, minSize: 200, mustContain: ['# '] },
+        { path: `${current.featureDir}/feature-map.json`, minSize: 80, json: true },
+      ],
       gate: 'pre_tech_design',
       subagent: 'tech-design',
       run: makeRunner('tech-design'),
+      afterPass: (current, currentInv) => {
+        syncPlanningArtifact(current, currentInv, 'tech-design.md');
+        syncPlanningArtifact(current, currentInv, 'feature-map.json');
+      },
     },
   ];
   return drivePhases(state, inv, deps, engine, 'implementation-plan', phases);
+}
+
+/** Copy the primary service's shared planning artifacts to every other writable service. */
+function syncPlanningArtifact(state: ExecutionState, inv: FeatureDevInvocation, filename: 'prd.md' | 'tech-design.md' | 'feature-map.json'): void {
+  const source = resolve(state.featureDir, filename);
+  if (!existsSync(source)) throw new Error(`Planning artifact is missing: ${source}`);
+  const primary = resolve(state.featureDir);
+  // Older single-service plans can have a lightweight apps.json without
+  // repository routing. There is no collaborator destination in that case.
+  let targets: ReturnType<typeof resolveServiceTargets>;
+  try {
+    targets = resolveServiceTargets(inv.projectRoot, state.featureDir);
+  } catch {
+    return;
+  }
+  for (const target of targets) {
+    if (resolve(target.featureDir) === primary) continue;
+    mkdirSync(target.featureDir, { recursive: true });
+    copyFileSync(source, resolve(target.featureDir, filename));
+  }
 }
 
 /**

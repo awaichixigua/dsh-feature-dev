@@ -8,6 +8,7 @@
 
 import { execFileSync } from 'node:child_process';
 import type { AutoCommitResult, WorkflowId } from '../types/contracts.js';
+import { resolveServiceTargets } from './service-targets.js';
 
 export interface AutoCommitInput {
   cwd: string;
@@ -60,6 +61,31 @@ export function autoCommitAndPush(
   } catch (error) {
     return { status: 'commit_failed', ...(repository ? { repository } : {}), error: errorMessage(error) };
   }
+}
+
+/** Commit and push every writable service for a multi-service plan or TDD run. */
+export function autoCommitAndPushServices(
+  input: AutoCommitInput & { projectRoot: string },
+  git: GitCommandRunner = systemGit
+): AutoCommitResult {
+  let targets;
+  try {
+    targets = resolveServiceTargets(input.projectRoot, input.cwd);
+  } catch (error) {
+    return { status: 'commit_failed', error: errorMessage(error) };
+  }
+  const services = targets.map((target) => {
+    const result = autoCommitAndPush({ ...input, cwd: target.featureDir }, git);
+    return { service: target.service, ...result };
+  });
+  const status = services.some((result) => result.status === 'commit_failed')
+    ? 'commit_failed'
+    : services.some((result) => result.status === 'push_failed')
+      ? 'push_failed'
+      : services.some((result) => result.status === 'committed_and_pushed')
+        ? 'committed_and_pushed'
+        : 'no_changes';
+  return { status, services };
 }
 
 function errorMessage(error: unknown): string {

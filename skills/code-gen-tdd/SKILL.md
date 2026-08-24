@@ -8,7 +8,11 @@ argument-hint: --feature-dir <path> [--feature-id F-001] [--skip-unit-tests=fals
 
 # code-gen-tdd
 
+`--feature-id F-001` 会读取 `feature-map.json`，仅对该功能点声明的服务执行 TDD；测试规格、审查和测试报告写入 `ai/F-001/`，不会覆盖其他功能点或全量执行产物。未传该参数时保持全需求执行。
+
 适用于已有 `tech-design.md` 的需求实现。工作流会自行处理测试规格、实现、审查、测试生成与执行；不要绕开它直接开始实现。
+
+若 feature 目录中存在由 `implementation-plan` 生成的 `apps.json`，工作流会对其中每个主改和协作服务分别执行各阶段，并在该服务仓库内生成测试规格、实现、审查和测试产物。
 
 ```text
 /code-gen-tdd --feature-dir req/create-order

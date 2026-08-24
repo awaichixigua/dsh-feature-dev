@@ -66,6 +66,13 @@ export interface AutoCommitResult {
   repository?: string;
   commit?: string;
   error?: string;
+  services?: Array<{
+    service: string;
+    status: AutoCommitResult['status'];
+    repository?: string;
+    commit?: string;
+    error?: string;
+  }>;
 }
 
 export type ModelRole = 'planning' | 'coding' | 'review' | 'summary';

@@ -6,6 +6,24 @@ model_role: planning
 output: tech-design.md
 ---
 
+<!--
+Feature-to-service contract: tech-design.md must include a 功能点 × 服务 matrix.
+For every feature, use a stable F-<id>, list every writable owning service from
+apps.json, the primary owner, interfaces/events, and acceptance criteria.
+Also create <featureDir>/feature-map.json exactly in this form:
+{
+  "version": 1,
+  "features": [{
+    "id": "F-001",
+    "name": "创建订单",
+    "services": ["order-service", "inventory-service"],
+    "acceptanceCriteria": ["AC-001", "AC-002"]
+  }]
+}
+services must contain only writable services declared in apps.json. This JSON
+artifact is required even for a single service or a single feature.
+-->
+
 # Agent: tech-design
 
 基于 PRD 产出技术设计，含服务范围分析、接口、数据模型和测试策略。

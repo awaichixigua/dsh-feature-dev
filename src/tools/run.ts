@@ -19,7 +19,7 @@ import { ensureBugCase } from '../runtime/bug-case.js';
 import { Lifecycle } from '../runtime/lifecycle.js';
 import { RunMetricsReporter } from '../metrics/reporter.js';
 import type { WorkflowId } from '../types/contracts.js';
-import { autoCommitAndPush } from '../runtime/auto-commit.js';
+import { autoCommitAndPush, autoCommitAndPushServices } from '../runtime/auto-commit.js';
 
 export interface RunArgs {
   workflow?: string;
@@ -188,7 +188,7 @@ export async function runFeatureDev(
     // report un-flushed and a future resume would skip it.
     await lifecycle.onRunEnd(finalState);
     const autoCommit = shouldAutoCommit(finalState, inv) && isAutoCommitWorkflow(finalState.workflow)
-      ? autoCommitAndPush({ cwd: finalState.featureDir, workflow: finalState.workflow, runId: finalState.runId })
+      ? autoCommitForWorkflow(finalState)
       : undefined;
     return ok({
       runId: finalState.runId,
@@ -204,6 +204,13 @@ export async function runFeatureDev(
   } catch (e) {
     return fail(e);
   }
+}
+
+function autoCommitForWorkflow(state: import('../types/contracts.js').ExecutionState): AutoCommitResult {
+  const input = { cwd: state.featureDir, workflow: state.workflow as Extract<WorkflowId, 'implementation-plan' | 'code-gen-tdd' | 'bugfix'>, runId: state.runId };
+  return state.workflow === 'implementation-plan' || state.workflow === 'code-gen-tdd'
+    ? autoCommitAndPushServices({ ...input, projectRoot: state.projectRoot })
+    : autoCommitAndPush(input);
 }
 
 function shouldAutoCommit(state: import('../types/contracts.js').ExecutionState, inv: FeatureDevInvocation): boolean {

@@ -27,6 +27,7 @@ function makeProject(): { project: string; featureDir: string } {
     ['mrd-clarified.md', '# Clarified MRD\n\n' + 'x'.repeat(300)],
     ['prd.md', '# PRD\n\n' + 'x'.repeat(300)],
     ['tech-design.md', '# Tech Design\n\n' + 'x'.repeat(300)],
+    ['feature-map.json', JSON.stringify({ version: 1, features: [{ id: 'F-001', name: 'E2E feature', services: ['fixture-service'] }] })],
     ['ai/test_spec.md', '# Test Spec\n\n' + 'x'.repeat(180)],
     ['ai/code-review.md', '# Code Review\n\n' + 'x'.repeat(180)],
     ['ai/unit_test_report.md', '# Test Report\n\n' + 'x'.repeat(180)],

@@ -89,13 +89,13 @@ sequenceDiagram
 | 工作流 | 实际阶段与分支 | 关键行为 |
 | --- | --- | --- |
 | `implementation-plan` | `MRD_READER → SERVICE_ROUTER → BRANCH_GATE → CLARIFY → PRD → TECH_DESIGN` | 需求先在 `.tmp/<需求名>` 暂存；分支准备后将正式文档和状态落到主服务仓库。`CLARIFY` 是主会话操作，不启动澄清子代理。 |
-| `code-gen-tdd` | 测试规格 → 实现 → 审查 → 可选测试生成/执行 → 汇总；失败时进入修复分支 | 默认跳过测试生成与执行；只有 `--skip-unit-tests=false` 才启用。修复次数受 `maxRepairAttempts` 限制。 |
+| `code-gen-tdd` | 对选中的每个可写服务执行：测试规格 → 实现 → 审查 → 可选测试生成/执行 → 汇总；失败时进入修复分支 | 不传 `featureId` 时从 `apps.json` 解析全部主改和协作服务；传 `featureId` 时由 `feature-map.json` 限定服务范围。默认跳过测试生成与执行；只有 `--skip-unit-tests=false` 才启用。修复次数受 `maxRepairAttempts` 限制。 |
 | `bugfix` | `LOCATE → (DOC_REVISION?) → CODE_FIX → (VERIFY?) → REPORT` | `LOCATE` 成功后自动按分类选择分支；只有业务需求缺口会进入 `DOC_REVISION`。验证仅在请求单元测试时运行。 |
 | `archive` | `SNAPSHOT → FRESHNESS_CHECK → KB_UPDATE → REPORT` | 创建归档报告并检查、更新知识库。 |
 | `mrd-to-code` | `implementation-plan → code-gen-tdd → archive` | 一个 `runId` 和一份根状态贯穿三个子工作流；任一暂停或阻塞立即返回主会话。 |
 | `knowledge-base`、`prd-clarify`、`influence-menu` | 单次子代理调用 | 通过 `oneShot` 执行并按声明校验必要产物。 |
 
-`implementation-plan` 的服务路由有两个主会话分支：服务范围不完整时返回 `pendingMainAction.kind = route_services`，主会话补全 `apps.json` 后恢复；需求澄清时返回 `clarify_mrd`，主会话写入 `mrd-clarified.md` 后恢复。两者都不会重新启动已完成的路由或澄清阶段。
+`implementation-plan` 的服务路由有两个主会话分支：服务范围不完整时返回 `pendingMainAction.kind = route_services`，主会话补全 `apps.json` 后恢复；需求澄清时返回 `clarify_mrd`，主会话写入 `mrd-clarified.md` 后恢复。两者都不会重新启动已完成的路由或澄清阶段。技术方案必须输出“功能点 × 服务”矩阵及等价的 `feature-map.json`，PRD、技术方案和映射文件成功生成后会同步到所有协作服务的需求目录。
 
 ## 门禁、恢复与失败
 
@@ -114,7 +114,7 @@ sequenceDiagram
 
 `implementation-plan` 的 `BRANCH_GATE` 会读取 `apps.json` 的 `primary`、`collaborators` 与 `repositories`，为每个可写服务切换或创建 `fun_<版本>_<需求编号>_<标题>_<Git 用户名>` 分支。新分支从 `origin/release` 创建并以 `git push -u origin <branch>` 发布。
 
-`implementation-plan`、`code-gen-tdd` 和 `bugfix` 可传 `--auto-comit`（兼容 `--auto-commit`）。运行成功结束时，`src/runtime/auto-commit.ts` 在 `featureDir` 所属仓库执行 `git add --all`、`git commit` 与 `git push`；这会包含新增、删除及其他现有工作区变更。结果通过 `autoCommit.status` 返回。
+`implementation-plan`、`code-gen-tdd` 和 `bugfix` 可传 `--auto-comit`（兼容 `--auto-commit`）。运行成功结束时，`src/runtime/auto-commit.ts` 执行 `git add --all`、`git commit` 与 `git push`；多服务的 planning/TDD 会逐个可写服务仓库执行。它会包含新增、删除及其他现有工作区变更；逐服务结果通过 `autoCommit.services` 返回。
 
 ## 配置与指标
 

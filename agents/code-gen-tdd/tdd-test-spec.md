@@ -6,6 +6,10 @@ model_role: planning
 output: test_spec.md
 ---
 
+<!-- When inputs.featureId is present, implement only inputs.feature in the
+current service. Write the specification to inputs.testSpecPath; never overwrite
+another feature's test specification. -->
+
 # Agent: tdd-test-spec
 
 code-gen-tdd 的第 1 阶段。吃 `<featureDir>/tech-design.md`，产出 `<featureDir>/ai/test_spec.md`。
