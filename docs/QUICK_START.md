@@ -75,10 +75,11 @@ MRD URL 的抓取、解析和服务路由会先在 `.tmp/<featureDir 的目录�
 每次运行的权威状态都保存在：
 
 ```text
-<feature-dir>/ai/execution-state.json
+<feature-dir>/ai/current-run.json
+<feature-dir>/ai/runs/<runId>/execution-state.json
 ```
 
-同目录的 `execution-state.md` 用于阅读，审计事件也会被持久化。常见需求产物包括：
+每个运行目录中的 `execution-state.md` 用于阅读，`run-events.jsonl` 保存审计事件。常见需求产物包括：
 
 ```text
 <feature-dir>/mrd-original.md

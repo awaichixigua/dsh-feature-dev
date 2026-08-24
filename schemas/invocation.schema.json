@@ -33,6 +33,7 @@
       "properties": {
         "resume": { "type": "boolean" },
         "unitTests": { "type": "boolean" },
+        "skipUnitTests": { "type": "boolean" },
         "generateUnitTestsOnly": { "type": "boolean" },
         "clarifyMode": { "type": "string", "enum": ["dialogue", "batch"] },
         "skipMrdClarify": { "type": "boolean" },

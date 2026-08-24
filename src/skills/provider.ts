@@ -177,6 +177,8 @@ function applyTokens(out: NormalizeInput, tokens: readonly string[]): void {
       if (VALUE_FLAGS.has(key) && i + 1 < tokens.length) {
         const value = tokens[++i]!;
         applyKey(out, key, value);
+      } else if (key === 'skip-unit-tests') {
+        out.options = { ...(out.options ?? {}), skipUnitTests: true };
       } else {
         out.options = { ...(out.options ?? {}), [key]: true } as import('../types/contracts.js').InvocationOptions;
       }
@@ -214,12 +216,24 @@ function applyKey(out: NormalizeInput, key: string, value: string): void {
       out.clarifyMode = value as 'dialogue' | 'batch';
       out.options = { ...(out.options ?? {}), clarifyMode: value as 'dialogue' | 'batch' };
       break;
+    case 'skip-unit-tests':
+      out.options = { ...(out.options ?? {}), skipUnitTests: parseBoolean(value, '--skip-unit-tests') };
+      break;
+    case 'unit-tests':
+      out.options = { ...(out.options ?? {}), unitTests: parseBoolean(value, '--unit-tests') };
+      break;
     case 'bug':
       out.bugDescription = value;
       break;
     default:
       out.options = { ...(out.options ?? {}), [key]: value } as import('../types/contracts.js').InvocationOptions;
   }
+}
+
+function parseBoolean(value: string, field: string): boolean {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new ValidationError(`${field} must be true or false`);
 }
 
 /**

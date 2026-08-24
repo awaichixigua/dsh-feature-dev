@@ -107,7 +107,8 @@ export async function runFeatureDev(
       featureDir: inv.featureDir ?? inv.projectRoot,
       featureId: inv.featureId,
       bugDescription: inv.bugDescription,
-      ...(inv.workflow === 'bugfix' ? { unitTestsRequested: inv.options.unitTests, bugCaseDir } : {}),
+      unitTestsRequested: inv.options.unitTests,
+      ...(inv.workflow === 'bugfix' ? { bugCaseDir } : {}),
       modelOverrides: inv.modelOverrides,
       // Orchestrator workflows own their initial activeWorkflow.
       // For mrd-to-code, implementation-plan is the first sub; the

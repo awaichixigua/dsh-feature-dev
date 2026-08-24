@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { runFeatureDev } from '../../src/tools/run.js';
 import { resumeFeatureDev } from '../../src/tools/resume.js';
 import { confirmFeatureDev } from '../../src/tools/confirm.js';
@@ -15,12 +16,15 @@ const CTX = { packageRoot: PKG_ROOT, importMetaUrl: import.meta.url };
 
 function makeProject(): { project: string; featureDir: string } {
   const project = mkdtempSync(join(tmpdir(), 'dsh-mrd-e2e-'));
-  const featureDir = join(project, 'req', 'e2e');
-  mkdirSync(join(project, '.git'), { recursive: true });
+  const featureName = '2.0.0_103111_e2e';
+  const featureDir = join(project, 'req', featureName);
+  const stagingDir = join(project, '.tmp', featureName);
   mkdirSync(join(featureDir, 'ai'), { recursive: true });
+  mkdirSync(stagingDir, { recursive: true });
 
   const artifacts: Array<[string, string]> = [
     ['mrd-original.md', '# MRD\n\n' + 'x'.repeat(300)],
+    ['mrd-clarified.md', '# Clarified MRD\n\n' + 'x'.repeat(300)],
     ['prd.md', '# PRD\n\n' + 'x'.repeat(300)],
     ['tech-design.md', '# Tech Design\n\n' + 'x'.repeat(300)],
     ['ai/test_spec.md', '# Test Spec\n\n' + 'x'.repeat(180)],
@@ -31,6 +35,27 @@ function makeProject(): { project: string; featureDir: string } {
   for (const [path, contents] of artifacts) {
     writeFileSync(join(featureDir, path), contents, 'utf8');
   }
+
+  writeFileSync(join(stagingDir, 'mrd-original.md'), '# MRD\n\n' + 'x'.repeat(300), 'utf8');
+  writeFileSync(join(stagingDir, 'apps.json'), JSON.stringify({
+    primary: ['fixture-service'],
+    collaborators: [],
+    repositories: { 'fixture-service': '.' },
+  }, null, 2), 'utf8');
+
+  // BRANCH_GATE deliberately performs real Git operations. Give the fixture
+  // a minimal release branch and local bare origin so the E2E test exercises
+  // the production path without depending on a network remote.
+  writeFileSync(join(project, '.gitignore'), '.tmp/\n.remote.git/\n', 'utf8');
+  execFileSync('git', ['init'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'fixture'], { cwd: project });
+  execFileSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: project });
+  execFileSync('git', ['switch', '-c', 'release'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['add', '.gitignore', 'req'], { cwd: project });
+  execFileSync('git', ['commit', '-m', 'fixture baseline'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['init', '--bare', '.remote.git'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['remote', 'add', 'origin', join(project, '.remote.git')], { cwd: project });
+  execFileSync('git', ['push', '-u', 'origin', 'release'], { cwd: project, stdio: 'ignore' });
   return { project, featureDir };
 }
 
@@ -42,14 +67,20 @@ void test('mrd-to-code completes implementation-plan, code-gen-tdd, and archive 
       projectRoot: project,
       featureDir,
       mrdUrl: 'https://example.com/mrd',
-        options: {},
+      options: {},
     });
     assert.equal(started.ok, true, JSON.stringify(started, null, 2));
 
-    const repo = new StateRepository({ projectRoot: project, featureDir });
+    if (!started.ok) return;
+    let currentFeatureDir = started.data.featureDir;
+    let repo = new StateRepository({ projectRoot: project, featureDir: currentFeatureDir, runId: started.data.runId });
     const visited = new Set<string>();
     for (let step = 0; step < 30; step += 1) {
       const state = repo.read();
+      if (state.featureDir !== currentFeatureDir) {
+        currentFeatureDir = state.featureDir;
+        repo = new StateRepository({ projectRoot: project, featureDir: currentFeatureDir, runId: state.runId });
+      }
       if (state.activeWorkflow) visited.add(state.activeWorkflow);
       if (state.status === 'completed') break;
 
@@ -58,20 +89,29 @@ void test('mrd-to-code completes implementation-plan, code-gen-tdd, and archive 
         const choice = confirmation.options.find((item) => item !== 'revise' && item !== 'abort')!;
         const confirmed = await confirmFeatureDev(CTX, {
           projectRoot: project,
-          featureDir,
+          featureDir: currentFeatureDir,
+          runId: state.runId,
           gateId: confirmation.id,
           choice,
         });
         assert.equal(confirmed.ok, true, JSON.stringify(confirmed, null, 2));
       } else {
-        const resumed = await resumeFeatureDev(CTX, { projectRoot: project, featureDir });
+        const resumed = await resumeFeatureDev(CTX, {
+          projectRoot: project,
+          featureDir: currentFeatureDir,
+          runId: state.runId,
+        });
         assert.equal(resumed.ok, true, JSON.stringify(resumed, null, 2));
+        if (resumed.ok && resumed.data.featureDir !== currentFeatureDir) {
+          currentFeatureDir = resumed.data.featureDir;
+          repo = new StateRepository({ projectRoot: project, featureDir: currentFeatureDir, runId: state.runId });
+        }
       }
     }
 
     const finalState = repo.read();
     assert.equal(finalState.workflow, 'mrd-to-code');
-    assert.equal(finalState.activeWorkflow, undefined);
+    assert.equal(finalState.activeWorkflow, undefined, JSON.stringify(finalState, null, 2));
     assert.equal(finalState.status, 'completed');
     assert.equal(finalState.currentPhase, 'COMPLETED');
     assert.ok(visited.has('implementation-plan'));
@@ -79,7 +119,7 @@ void test('mrd-to-code completes implementation-plan, code-gen-tdd, and archive 
     assert.ok(finalState.phaseHistory.some((entry) => entry.phase === 'MRD_READER'));
     assert.ok(finalState.phaseHistory.some((entry) => entry.phase === 'PHASE6_SUMMARY'));
     assert.ok(finalState.phaseHistory.some((entry) => entry.phase === 'REPORT'));
-    assert.equal(finalState.agentCount, 15);
+    assert.equal(finalState.agentCount, 12);
 
     const events = readFileSync(repo.eventsPath, 'utf8')
       .trim()

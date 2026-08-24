@@ -110,6 +110,15 @@ void test('buildTools produces 4 tools with parameters and output.render', () =>
   }
 });
 
+void test('resume/status/confirm expose optional runId routing', () => {
+  const tools = buildTools();
+  for (const name of ['feature_dev_resume', 'feature_dev_status', 'feature_dev_confirm']) {
+    const tool = tools.find((item) => item.name === name);
+    assert.ok(tool, `missing ${name}`);
+    assert.ok(tool?.parameters.properties.runId, `${name} should accept runId`);
+  }
+});
+
 void test('buildSkillProviderFactory: produces a provider with async list + get', async () => {
   const packageRoot = resolvePackageRoot(import.meta.url);
   const factory = buildSkillProviderFactory({ packageRoot, defaultWorkflow: 'code-gen-tdd' });

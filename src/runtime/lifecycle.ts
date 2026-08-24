@@ -28,6 +28,7 @@ import { assertTransition } from './state-machine.js';
 import { GateError } from './errors.js';
 import type { RunMetricsReporter, MetricsCategory } from '../metrics/index.js';
 import { createHash } from 'node:crypto';
+import { resolve } from 'node:path';
 
 export interface LifecycleDeps {
   repo: StateRepository;
@@ -183,6 +184,7 @@ export class Lifecycle {
         featureDir: state.featureDir,
         runType,
         sessionId: state.runId,
+        executionStatePath: executionStateMarkdownPath(state),
         featureId: state.featureId ?? inv.featureId ?? null,
         ...(state.bugDescription ? { bugId: deriveBugIdFromDescription(state.bugDescription) } : {}),
       });
@@ -253,6 +255,7 @@ export class Lifecycle {
         runType,
         sessionId: state.runId,
         featureId: state.featureId ?? null,
+        executionStatePath: executionStateMarkdownPath(state),
         ...(bugId ? { bugId } : {}),
       });
       // Always await the finishRun promise. The tool layer awaits
@@ -306,6 +309,10 @@ export class Lifecycle {
     const message = e instanceof Error ? e.message : String(e);
     state.notes = (state.notes ?? []).concat(`metrics:${kind}:${message}`);
   }
+}
+
+function executionStateMarkdownPath(state: ExecutionState): string {
+  return resolve(state.featureDir, 'ai', 'runs', state.runId, 'execution-state.md');
 }
 
 /**

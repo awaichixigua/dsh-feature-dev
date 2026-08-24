@@ -24,6 +24,8 @@ import { RunMetricsReporter } from '../metrics/reporter.js';
 export interface ResumeArgs {
   projectRoot: string;
   featureDir: string;
+  /** Resume a specific run; defaults to current-run.json. */
+  runId?: string;
   /**
    * Optional: which workflow to drive. If absent, the workflow
    * recorded in the persisted state is used. Useful for "mrd-to-code
@@ -58,7 +60,7 @@ export async function resumeFeatureDev(
     });
     const projectRoot = resolveProjectRoot({ explicit: args.projectRoot });
     const featureDir = validateFeatureDir(args.featureDir, projectRoot);
-    const repo = new StateRepository({ projectRoot, featureDir });
+    const repo = new StateRepository({ projectRoot, featureDir, runId: args.runId });
     if (!repo.exists()) {
       throw new NotFoundError('未找到可继续的 execution-state.json', { path: repo.statePath });
     }
@@ -86,6 +88,7 @@ export async function resumeFeatureDev(
         }
       );
     }
+    repo.activateRunPublic(state);
     if (state.status === 'blocked') {
       rewindMostRecentFailure(state);
       repo.writeAtomicPublic(state);
@@ -108,9 +111,9 @@ export async function resumeFeatureDev(
       rawUserRequest: undefined,
       options: {
         resume: true,
-        // Bugfix test execution is opt-in and must survive the LOCATE
-        // confirmation boundary; other workflows retain their default.
-        unitTests: state.workflow === 'bugfix' ? Boolean(state.unitTestsRequested) : true,
+        // Unit-test selection is persisted so gates and recovery do not
+        // silently change the user's test policy.
+        unitTests: Boolean(state.unitTestsRequested),
         generateUnitTestsOnly: false,
         clarifyMode: 'dialogue',
       },
@@ -160,7 +163,7 @@ export async function resumeFeatureDev(
       currentPhase: final.currentPhase,
       workflow: final.workflow,
       featureDir: final.featureDir,
-      statePath: new StateRepository({ projectRoot, featureDir: final.featureDir }).statePath,
+      statePath: new StateRepository({ projectRoot, featureDir: final.featureDir, runId: final.runId }).statePath,
       pendingConfirmations: final.pendingConfirmations,
       ...(final.pendingMainAction ? { pendingMainAction: final.pendingMainAction } : {}),
       ...(final.lastPhaseResult ? { lastPhaseResult: final.lastPhaseResult } : {}),

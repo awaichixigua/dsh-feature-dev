@@ -59,6 +59,22 @@ void test('normalizeInvocation: bugfix skips tests unless explicitly requested',
   assert.equal(requested.options.unitTests, true);
 });
 
+void test('normalizeInvocation: code-gen-tdd skips tests by default and enables them with skipUnitTests=false', () => {
+  const ctx = { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'code-gen-tdd' as const };
+  const defaults = normalizeInvocation({ workflow: 'code-gen-tdd', featureDir: process.cwd() }, ctx);
+  assert.equal(defaults.options.unitTests, false);
+  const requested = normalizeInvocation(
+    { workflow: 'code-gen-tdd', featureDir: process.cwd(), options: { skipUnitTests: false } },
+    ctx
+  );
+  assert.equal(requested.options.unitTests, true);
+  const legacyRequest = normalizeInvocation(
+    { workflow: 'code-gen-tdd', featureDir: process.cwd(), options: { unitTests: true } },
+    ctx
+  );
+  assert.equal(legacyRequest.options.unitTests, false);
+});
+
 void test('normalizeInvocation: rejects Claude placeholders in args', () => {
   assert.throws(
     () =>
@@ -115,6 +131,11 @@ void test('parseSkillArgv: detects mrdUrl and defaults to implementation-plan', 
 void test('parseSkillArgv: extracts clarify-mode', () => {
   const r = parseSkillArgv('implementation-plan https://example.com/x --clarify-mode=batch');
   assert.equal(r.options?.clarifyMode, 'batch');
+});
+
+void test('parseSkillArgv: --skip-unit-tests=false enables unit tests', () => {
+  const r = parseSkillArgv('code-gen-tdd --feature-dir req/foo --skip-unit-tests=false');
+  assert.equal(r.options?.skipUnitTests, false);
 });
 
 void test('parseSkillArgv: extracts a bugfix case id', () => {

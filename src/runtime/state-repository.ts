@@ -6,15 +6,16 @@
  * (write-temp + rename) so a crash never leaves half-written state.
  *
  * Layout (relative to projectRoot):
- *   {featureDir}/ai/execution-state.json   ← authoritative
- *   {featureDir}/ai/execution-state.md     ← projection
- *   {featureDir}/ai/run-events.jsonl       ← audit log
+ *   {featureDir}/ai/current-run.json
+ *   {featureDir}/ai/runs/{runId}/execution-state.json
+ *   {featureDir}/ai/runs/{runId}/execution-state.md
+ *   {featureDir}/ai/runs/{runId}/run-events.jsonl
  *
  * The repository DOES NOT re-parse Markdown. The Markdown is generated,
  * not consumed. State recovery always reads JSON.
  */
 
-import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync, copyFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -35,13 +36,21 @@ export interface StateRepositoryOptions {
   projectRoot: string;
   featureDir: string;
   stateSubdir?: string;
+  runId?: string;
+}
+
+interface CurrentRunPointer {
+  schemaVersion: '1.0.0';
+  runId: string;
+  workflow: WorkflowId;
+  updatedAt: string;
 }
 
 export class StateRepository {
   readonly aiDir: string;
-  readonly statePath: string;
-  readonly eventsPath: string;
-  readonly mdPath: string;
+  readonly runsDir: string;
+  readonly currentRunPath: string;
+  private boundRunId?: string;
 
   constructor(opts: StateRepositoryOptions) {
     if (!opts.projectRoot || !opts.featureDir) {
@@ -49,19 +58,47 @@ export class StateRepository {
     }
     const sub = opts.stateSubdir ?? DEFAULT_STATE_SUBDIR;
     this.aiDir = resolve(opts.featureDir, sub);
-    this.statePath = resolve(this.aiDir, 'execution-state.json');
-    this.eventsPath = resolve(this.aiDir, 'run-events.jsonl');
-    this.mdPath = resolve(this.aiDir, 'execution-state.md');
+    this.runsDir = resolve(this.aiDir, 'runs');
+    this.currentRunPath = resolve(this.aiDir, 'current-run.json');
+    this.migrateLegacyLayout();
+    const selectedRunId = opts.runId ?? this.readCurrentRunId() ?? this.findLatestRunId();
+    if (selectedRunId) this.bindRun(selectedRunId);
+    if (!opts.runId && selectedRunId && !existsSync(this.currentRunPath) && this.exists()) {
+      this.activateRunPublic(this.read());
+    }
+  }
+
+  get runId(): string | undefined {
+    return this.boundRunId;
+  }
+
+  get runDir(): string {
+    return this.boundRunId ? resolve(this.runsDir, this.boundRunId) : resolve(this.runsDir, '_unbound');
+  }
+
+  get statePath(): string {
+    return resolve(this.runDir, 'execution-state.json');
+  }
+
+  get eventsPath(): string {
+    return resolve(this.runDir, 'run-events.jsonl');
+  }
+
+  get mdPath(): string {
+    return resolve(this.runDir, 'execution-state.md');
   }
 
   ensureLayout(): void {
     if (!existsSync(this.aiDir)) {
       mkdirSync(this.aiDir, { recursive: true });
     }
+    if (!existsSync(this.runsDir)) {
+      mkdirSync(this.runsDir, { recursive: true });
+    }
   }
 
   exists(): boolean {
-    return existsSync(this.statePath);
+    return Boolean(this.boundRunId) && existsSync(this.statePath);
   }
 
   /** Read current state. Throws NotFoundError if missing. */
@@ -100,6 +137,7 @@ export class StateRepository {
     activeWorkflow?: WorkflowId;
   }): ExecutionState {
     this.ensureLayout();
+    this.bindRun(args.runId ?? randomUUID());
     if (this.exists()) {
       throw new ConflictError('execution-state.json already exists; refusing to overwrite', {
         path: this.statePath,
@@ -108,7 +146,7 @@ export class StateRepository {
     const now = new Date().toISOString();
     const state: ExecutionState = {
       schemaVersion: SCHEMA_VERSION,
-      runId: args.runId ?? randomUUID(),
+      runId: this.boundRunId!,
       workflow: args.workflow,
       activeWorkflow: args.activeWorkflow,
       orchestratorWorkflow: args.orchestratorWorkflow,
@@ -130,6 +168,8 @@ export class StateRepository {
     };
     this.writeAtomic(state);
     this.appendEvent({ kind: 'run_start', at: now, runId: state.runId, workflow: args.workflow });
+    this.regenerateMarkdown(state);
+    this.activateRunPublic(state);
     return state;
   }
 
@@ -154,58 +194,24 @@ export class StateRepository {
       // phase says COMPLETED while its last result is block/failed. Preserve an
       // exact snapshot, then treat an explicit new `run` call as a fresh run.
       if (isLegacyFalseCompletion(s, args.workflow)) {
-        const recoveryDir = resolve(this.aiDir, 'history');
-        mkdirSync(recoveryDir, { recursive: true });
-        const backupPath = resolve(
-          recoveryDir,
-          `execution-state-${s.runId}-false-completion.json`
-        );
-        if (!existsSync(backupPath)) {
-          writeFileSync(backupPath, JSON.stringify(s, null, 2) + '\n', 'utf8');
-        }
-
-        const now = new Date().toISOString();
-        const recovered: ExecutionState = {
-          schemaVersion: SCHEMA_VERSION,
-          runId: args.runId ?? randomUUID(),
-          workflow: args.workflow,
-          activeWorkflow: args.activeWorkflow,
-          orchestratorWorkflow: args.orchestratorWorkflow,
-          projectRoot: args.projectRoot,
-          featureDir: args.featureDir,
-          featureId: args.featureId,
-          bugDescription: args.bugDescription,
-          bugCaseDir: args.bugCaseDir,
-          unitTestsRequested: args.unitTestsRequested,
-          currentPhase: getInitialPhase(args.activeWorkflow ?? args.workflow),
-          phaseHistory: [],
-          startedAt: now,
-          updatedAt: now,
-          status: 'running',
-          repairCount: 0,
-          agentCount: 0,
-          pendingConfirmations: [],
-          modelOverrides: args.modelOverrides,
-          notes: [`Recovered legacy false completion; previous state: ${backupPath}`],
-        };
+        const previousPath = this.statePath;
+        const recovered = this.create(args);
+        recovered.notes = [`Recovered legacy false completion; previous state: ${previousPath}`];
         this.writeAtomic(recovered);
-        this.appendEvent({
-          kind: 'run_start',
-          at: now,
-          runId: recovered.runId,
-          workflow: recovered.workflow,
-        });
         this.regenerateMarkdown(recovered);
         return { state: recovered, created: true };
       }
-      // Terminal states are NOT auto-resumable. A caller must
-      // explicitly start a new run to retry, or clear the state
-      // file out of band.
+      // `feature_dev_run` after a terminal state creates a fresh run directory.
+      // The completed run remains immutable and queryable by runId.
       if (isTerminalStatus(s.status)) {
-        throw new ConflictError(
-          `Run is in a terminal state (${s.status}); create a new run to retry`,
-          { runId: s.runId, status: s.status }
-        );
+        return { state: this.create(args), created: true };
+      }
+      if (s.workflow !== args.workflow) {
+        throw new ConflictError('A different workflow is already active for this feature', {
+          activeRunId: s.runId,
+          activeWorkflow: s.workflow,
+          requestedWorkflow: args.workflow,
+        });
       }
       // Pending confirmation gates MUST be resolved before any
       // `run` / `resume` action advances the workflow. Without
@@ -230,8 +236,10 @@ export class StateRepository {
       // path for a blocked run. Persist missing context before rewinding so the
       // subsequent resume path never loses the original bug description.
       if (args.bugDescription) s.bugDescription = args.bugDescription;
+      if (args.unitTestsRequested !== undefined) {
+        s.unitTestsRequested = args.unitTestsRequested;
+      }
       if (args.workflow === 'bugfix') {
-        s.unitTestsRequested = args.unitTestsRequested ?? false;
         if (args.bugCaseDir) s.bugCaseDir = args.bugCaseDir;
       }
       if (s.status === 'blocked') {
@@ -420,7 +428,23 @@ export class StateRepository {
    * phase lifecycle (e.g. confirm rewinding).
    */
   writeAtomicPublic(state: ExecutionState): void {
+    this.bindRun(state.runId);
     this.writeAtomic(state);
+  }
+
+  /** Atomically make a run the default target for status/resume/confirm. */
+  activateRunPublic(state: ExecutionState): void {
+    this.bindRun(state.runId);
+    this.ensureLayout();
+    const pointer: CurrentRunPointer = {
+      schemaVersion: SCHEMA_VERSION,
+      runId: state.runId,
+      workflow: state.workflow,
+      updatedAt: state.updatedAt,
+    };
+    const tmp = this.currentRunPath + '.tmp-' + process.pid;
+    writeFileSync(tmp, JSON.stringify(pointer, null, 2) + '\n', 'utf8');
+    renameSync(tmp, this.currentRunPath);
   }
 
   /** Rebuild the human-readable state projection after a repository move. */
@@ -431,11 +455,75 @@ export class StateRepository {
   // ---- internals ---------------------------------------------------------
 
   private writeAtomic(state: ExecutionState): void {
+    this.bindRun(state.runId);
     this.ensureLayout();
+    if (!existsSync(this.runDir)) mkdirSync(this.runDir, { recursive: true });
     const json = JSON.stringify(state, null, 2) + '\n';
     const tmp = this.statePath + '.tmp-' + process.pid;
     writeFileSync(tmp, json, 'utf8');
     renameSync(tmp, this.statePath);
+    if (this.readCurrentRunId() === state.runId) {
+      this.activateRunPublic(state);
+    }
+  }
+
+  private bindRun(runId: string): void {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(runId)) {
+      throw new ValidationError('Invalid runId', { runId });
+    }
+    this.boundRunId = runId;
+  }
+
+  private readCurrentRunId(): string | undefined {
+    if (!existsSync(this.currentRunPath)) return undefined;
+    try {
+      const value = JSON.parse(readFileSync(this.currentRunPath, 'utf8')) as Partial<CurrentRunPointer>;
+      return typeof value.runId === 'string' && value.runId.length > 0 ? value.runId : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private findLatestRunId(): string | undefined {
+    if (!existsSync(this.runsDir)) return undefined;
+    const candidates: Array<{ runId: string; mtime: number }> = [];
+    for (const entry of readdirSync(this.runsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const statePath = resolve(this.runsDir, entry.name, 'execution-state.json');
+      if (!existsSync(statePath)) continue;
+      try {
+        candidates.push({ runId: entry.name, mtime: statSync(statePath).mtimeMs });
+      } catch {
+        // Ignore incomplete or unreadable orphan directories.
+      }
+    }
+    candidates.sort((a, b) => b.mtime - a.mtime);
+    return candidates[0]?.runId;
+  }
+
+  /** Copy the legacy flat files into a run directory, then publish the pointer. */
+  private migrateLegacyLayout(): void {
+    if (existsSync(this.currentRunPath)) return;
+    const legacyStatePath = resolve(this.aiDir, 'execution-state.json');
+    if (!existsSync(legacyStatePath)) return;
+    let state: ExecutionState;
+    try {
+      state = JSON.parse(readFileSync(legacyStatePath, 'utf8')) as ExecutionState;
+      this.bindRun(state.runId);
+    } catch {
+      return;
+    }
+    this.ensureLayout();
+    if (!existsSync(this.runDir)) mkdirSync(this.runDir, { recursive: true });
+    const files: Array<[string, string]> = [
+      [legacyStatePath, this.statePath],
+      [resolve(this.aiDir, 'execution-state.md'), this.mdPath],
+      [resolve(this.aiDir, 'run-events.jsonl'), this.eventsPath],
+    ];
+    for (const [source, target] of files) {
+      if (existsSync(source) && !existsSync(target)) copyFileSync(source, target);
+    }
+    this.activateRunPublic(state);
   }
 
   private appendEvent(event: RunEvent): void {

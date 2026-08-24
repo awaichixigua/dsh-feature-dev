@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   defaultRepoPathProbe,
@@ -103,7 +103,7 @@ export function prepareRequirementBranches(
     const evidence: string[] = [];
     for (const [service, repo] of repositories) {
       const gitRoot = git.run(repo, ['rev-parse', '--show-toplevel']);
-      if (resolve(gitRoot) !== resolve(repo)) {
+      if (canonicalRepositoryPath(gitRoot) !== canonicalRepositoryPath(repo)) {
         throw new Error(`服务 ${service} 的仓库路径必须指向 Git 顶层目录：${repo}`);
       }
       const userName = git.run(repo, ['config', 'user.name']);
@@ -142,6 +142,21 @@ export function prepareRequirementBranches(
     const detail = error instanceof Error ? error.message : String(error);
     return { ok: false, summary: '需求分支门禁未通过', evidence: [], blocker: detail };
   }
+}
+
+/**
+ * Git for Windows may return a long path while the process was launched from
+ * an equivalent 8.3 short path. Resolve both through the filesystem before
+ * comparing so aliases and case differences do not create a false mismatch.
+ */
+function canonicalRepositoryPath(path: string): string {
+  let canonical = resolve(path);
+  try {
+    canonical = realpathSync.native(canonical);
+  } catch {
+    // Tests and preflight diagnostics may intentionally use synthetic paths.
+  }
+  return process.platform === 'win32' ? canonical.toLowerCase() : canonical;
 }
 
 function readWritableRepositories(

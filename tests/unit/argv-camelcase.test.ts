@@ -24,6 +24,11 @@ void test('--project-root / --mrd-url / --clarify-mode all convert', () => {
   assert.equal(r.clarifyMode, 'batch');
 });
 
+void test('--skip-unit-tests=false enables tests through the skill argument parser', () => {
+  const r = parseToolArgv('--feature-dir req/create-order --skip-unit-tests=false', 'code-gen-tdd');
+  assert.equal(r.options?.skipUnitTests, false);
+});
+
 void test('positional https URL becomes mrdUrl', () => {
   const r = parseToolArgv('https://example.com/share_doc/?token=abc', 'implementation-plan');
   assert.equal(r.workflow, 'implementation-plan');

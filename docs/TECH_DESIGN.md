@@ -375,6 +375,7 @@ interface FeatureDevInvocation {
   options: {
     resume: boolean
     unitTests: boolean
+    skipUnitTests?: boolean // false 时才生成并执行单测；默认跳过
     generateUnitTestsOnly: boolean
     clarifyMode?: 'dialogue' | 'batch'
   }
@@ -468,9 +469,10 @@ Agent 只报告本阶段结果，不得决定整个工作流完成。`pass` 至�
 新项目使用结构化 JSON 作为机器事实源，并生成 Markdown 摘要供人阅读：
 
 ```text
-{featureDir}/ai/execution-state.json   # 权威机器状态
-{featureDir}/ai/execution-state.md     # 人类可读投影
-{featureDir}/ai/run-events.jsonl       # 追加式审计事件
+{featureDir}/ai/current-run.json                         # 当前运行指针
+{featureDir}/ai/runs/{runId}/execution-state.json       # 权威机器状态
+{featureDir}/ai/runs/{runId}/execution-state.md         # 人类可读投影
+{featureDir}/ai/runs/{runId}/run-events.jsonl           # 追加式审计事件
 ```
 
 状态更新顺序：

@@ -89,6 +89,8 @@ export interface StartRunArgs {
   featureId?: string | null;
   featureSuffix?: string | null;
   featureDependencies?: string | string[] | null;
+  /** Per-run Markdown projection path. */
+  executionStatePath?: string | null;
   /** Override "now" for tests. */
   at?: string;
 }
@@ -121,7 +123,7 @@ export interface FinishRunArgs {
   sessionId?: string | null;
   /** Caller can supply the SHA of an explicit AI commit if it knows it. */
   aiCommitSha?: string | null;
-  /** Path to the execution-state.md; required for code_gen, null for bugfix. */
+  /** Path to the per-run execution-state.md; required for code_gen, null for bugfix. */
   executionStatePath?: string | null;
   /** Path to the bugfix report; required for bugfix. */
   bugfixReportPath?: string | null;
@@ -237,7 +239,9 @@ export class RunMetricsReporter {
       binding_id: args.bindingId ?? null,
       project_root: projectRoot,
       feature_dir: featureDir,
-      execution_state_path: args.runType === 'code_gen' ? join(featureDir, 'ai', 'execution-state.md') : null,
+      execution_state_path: args.runType === 'code_gen'
+        ? (args.executionStatePath ?? join(featureDir, 'ai', 'execution-state.md'))
+        : null,
       bugfix_report_path: args.bugCaseDir ? join(args.bugCaseDir, 'bugfix-report.md') : null,
       bugfix_report_fingerprint: fileFingerprint(
         args.bugCaseDir ? join(args.bugCaseDir, 'bugfix-report.md') : null
@@ -347,6 +351,9 @@ export class RunMetricsReporter {
     }
 
     const refreshed = readJson<RunMetricsState>(stateFile);
+    if (args.executionStatePath !== undefined) {
+      refreshed.execution_state_path = args.executionStatePath;
+    }
     refreshScopeDependencies(refreshed, args.featureDependencies ?? null);
     const resultTree = safeSnapshot(refreshed.project_root);
     const resultSha = safeHead(refreshed.project_root);

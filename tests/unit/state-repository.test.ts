@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   mkdtempSync,
+  mkdirSync,
   rmSync,
   existsSync,
   readFileSync,
@@ -16,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { StateRepository } from '../../src/runtime/state-repository.ts';
+import { statusFeatureDev } from '../../src/tools/status.ts';
 
 function makeTmp(): string {
   return mkdtempSync(join(tmpdir(), 'dsh-fd-test-'));
@@ -41,15 +43,94 @@ void test('create() writes atomic state file and run_start event', () => {
   }
 });
 
-void test('create() twice throws conflict', () => {
+void test('current-run.json points at the latest run and explicit runId reads history', () => {
   const dir = makeTmp();
   try {
     const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
-    repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
-    assert.throws(
-      () => repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir }),
-      /already exists/
+    const first = repo.create({ workflow: 'implementation-plan', projectRoot: dir, featureDir: dir });
+    repo.transition(first, 'COMPLETED');
+    const second = repo.loadOrCreate({ workflow: 'code-gen-tdd', projectRoot: dir, featureDir: dir });
+    const pointer = JSON.parse(readFileSync(repo.currentRunPath, 'utf8')) as { runId: string };
+    assert.equal(pointer.runId, second.state.runId);
+    const historical = new StateRepository({ projectRoot: dir, featureDir: dir, runId: first.runId });
+    assert.equal(historical.read().workflow, 'implementation-plan');
+    assert.equal(historical.read().status, 'completed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+void test('feature_dev_status resolves current and historical runs by runId', async () => {
+  const dir = makeTmp();
+  try {
+    mkdirSync(join(dir, '.git'), { recursive: true });
+    const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
+    const first = repo.create({ workflow: 'implementation-plan', projectRoot: dir, featureDir: dir });
+    repo.transition(first, 'COMPLETED');
+    const second = repo.create({ workflow: 'code-gen-tdd', projectRoot: dir, featureDir: dir });
+    const current = await statusFeatureDev(
+      { packageRoot: dir, importMetaUrl: import.meta.url },
+      { projectRoot: dir, featureDir: dir }
     );
+    assert.equal(current.ok, true);
+    if (current.ok) assert.equal(current.data.runId, second.runId);
+    const historical = await statusFeatureDev(
+      { packageRoot: dir, importMetaUrl: import.meta.url },
+      { projectRoot: dir, featureDir: dir, runId: first.runId }
+    );
+    assert.equal(historical.ok, true);
+    if (historical.ok) assert.equal(historical.data.workflow, 'implementation-plan');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+void test('legacy flat layout is copied into runs/<runId> and becomes current', () => {
+  const dir = makeTmp();
+  try {
+    const aiDir = join(dir, 'ai');
+    mkdirSync(aiDir, { recursive: true });
+    const legacy = {
+      schemaVersion: '1.0.0', runId: 'legacy-run', workflow: 'archive', projectRoot: dir, featureDir: dir,
+      currentPhase: 'COMPLETED', phaseHistory: [], startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(), status: 'completed', repairCount: 0, agentCount: 0,
+      pendingConfirmations: [],
+    };
+    writeFileSync(join(aiDir, 'execution-state.json'), JSON.stringify(legacy), 'utf8');
+    writeFileSync(join(aiDir, 'execution-state.md'), '# legacy', 'utf8');
+    writeFileSync(join(aiDir, 'run-events.jsonl'), '{"kind":"run_start"}\n', 'utf8');
+    const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
+    assert.equal(repo.runId, 'legacy-run');
+    assert.equal(repo.read().runId, 'legacy-run');
+    assert.ok(existsSync(join(repo.runsDir, 'legacy-run', 'execution-state.md')));
+    assert.ok(existsSync(repo.currentRunPath));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+void test('create() twice creates isolated run directories', () => {
+  const dir = makeTmp();
+  try {
+    const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
+    const first = repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
+    const second = repo.create({ workflow: 'influence-menu', projectRoot: dir, featureDir: dir });
+    assert.notEqual(second.runId, first.runId);
+    assert.ok(existsSync(join(repo.runsDir, first.runId, 'execution-state.json')));
+    assert.ok(existsSync(join(repo.runsDir, second.runId, 'execution-state.json')));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+void test('loadOrCreate rejects a different workflow while the current run is active', () => {
+  const dir = makeTmp();
+  try {
+    const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
+    repo.create({ workflow: 'implementation-plan', projectRoot: dir, featureDir: dir });
+    assert.throws(() => repo.loadOrCreate({
+      workflow: 'code-gen-tdd', projectRoot: dir, featureDir: dir,
+    }), /different workflow is already active/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -120,15 +201,14 @@ void test('loadOrCreate recovers a legacy false completion as a fresh run', () =
     assert.equal(loaded.state.currentPhase, 'INITIALIZED');
     assert.equal(loaded.state.phaseHistory.length, 0);
     assert.match(loaded.state.notes?.[0] ?? '', /false completion/);
-    const historyDir = join(repo.aiDir, 'history');
-    assert.ok(existsSync(historyDir));
-    assert.ok(readdirSync(historyDir).some((name) => name.includes(old.runId)));
+    assert.ok(existsSync(join(repo.runsDir, old.runId, 'execution-state.json')));
+    assert.ok(existsSync(join(repo.runsDir, loaded.state.runId, 'execution-state.json')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-void test('loadOrCreate still rejects a genuinely completed run', () => {
+void test('loadOrCreate preserves a completed run before starting a different workflow', () => {
   const dir = makeTmp();
   try {
     const repo = new StateRepository({ projectRoot: dir, featureDir: dir });
@@ -143,11 +223,17 @@ void test('loadOrCreate still rejects a genuinely completed run', () => {
     });
     repo.transition(state, 'COMPLETED');
 
-    assert.throws(() => repo.loadOrCreate({
-      workflow: 'archive',
+    const next = repo.loadOrCreate({
+      workflow: 'code-gen-tdd',
       projectRoot: dir,
       featureDir: dir,
-    }), /terminal state/);
+    });
+    assert.equal(next.created, true);
+    assert.notEqual(next.state.runId, state.runId);
+    assert.equal(next.state.workflow, 'code-gen-tdd');
+    assert.equal(next.state.status, 'running');
+    assert.ok(existsSync(join(repo.runsDir, state.runId, 'execution-state.json')));
+    assert.ok(existsSync(join(repo.runsDir, next.state.runId, 'execution-state.json')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

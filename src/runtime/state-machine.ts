@@ -23,6 +23,8 @@ export interface TransitionContext {
 export interface NextPhaseOptions {
   /** Bugfix only: skip test-agent execution when tests were not requested. */
   skipBugfixVerify?: boolean;
+  /** Code-gen-tdd: skip unit-test generation and execution. */
+  skipCodeGenTddTests?: boolean;
 }
 
 const CODE_GEN_TDD_EDGES: EdgeMap = {
@@ -40,11 +42,12 @@ const CODE_GEN_TDD_EDGES: EdgeMap = {
   PHASE2_REPAIR: new Set(['PHASE3_REVIEW', 'BLOCKED']),
   PHASE3_REVIEW: new Set([
     'PHASE4_TEST_GENERATION',
+    'PHASE6_SUMMARY',
     'PHASE2_REPAIR',
     'BLOCKED',
   ]),
-  PHASE4_TEST_GENERATION: new Set(['PHASE5_TEST_EXECUTION', 'PHASE4_REPAIR', 'BLOCKED']),
-  PHASE4_REPAIR: new Set(['PHASE5_TEST_EXECUTION', 'BLOCKED']),
+  PHASE4_TEST_GENERATION: new Set(['PHASE5_TEST_EXECUTION', 'PHASE6_SUMMARY', 'PHASE4_REPAIR', 'BLOCKED']),
+  PHASE4_REPAIR: new Set(['PHASE5_TEST_EXECUTION', 'PHASE6_SUMMARY', 'BLOCKED']),
   PHASE5_TEST_EXECUTION: new Set(['PHASE6_SUMMARY', 'PHASE2_REPAIR', 'PHASE4_REPAIR', 'BLOCKED']),
   PHASE6_SUMMARY: new Set(['COMPLETED']),
   COMPLETED: new Set(),
@@ -189,14 +192,14 @@ export function nextPhaseFromResult(
         return 'PHASE3_REVIEW';
       case 'PHASE3_REVIEW':
         return result.status === 'pass' || result.status === 'warn'
-          ? 'PHASE4_TEST_GENERATION'
+          ? (options.skipCodeGenTddTests ? 'PHASE6_SUMMARY' : 'PHASE4_TEST_GENERATION')
           : 'PHASE2_REPAIR';
       case 'PHASE4_TEST_GENERATION':
         return result.status === 'pass' || result.status === 'warn'
-          ? 'PHASE5_TEST_EXECUTION'
+          ? (options.skipCodeGenTddTests ? 'PHASE6_SUMMARY' : 'PHASE5_TEST_EXECUTION')
           : 'PHASE4_REPAIR';
       case 'PHASE4_REPAIR':
-        return 'PHASE5_TEST_EXECUTION';
+        return options.skipCodeGenTddTests ? 'PHASE6_SUMMARY' : 'PHASE5_TEST_EXECUTION';
       case 'PHASE5_TEST_EXECUTION':
         if (result.status === 'pass' || result.status === 'warn') {
           return 'PHASE6_SUMMARY';

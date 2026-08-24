@@ -152,7 +152,11 @@ function settleDocumentsIntoService(
   // directory authoritative for status/confirm/resume.
   state.featureDir = primaryFeatureDir;
   state.updatedAt = new Date().toISOString();
-  const serviceRepo = new StateRepository({ projectRoot: inv.projectRoot, featureDir: primaryFeatureDir });
+  const serviceRepo = new StateRepository({
+    projectRoot: inv.projectRoot,
+    featureDir: primaryFeatureDir,
+    runId: state.runId,
+  });
   if (serviceRepo.exists()) {
     const existing = serviceRepo.read();
     if (existing.runId !== state.runId) {
@@ -163,6 +167,7 @@ function settleDocumentsIntoService(
   serviceRepo.writeAtomicPublic(state);
   if (existsSync(deps.repo.eventsPath)) copyFileSync(deps.repo.eventsPath, serviceRepo.eventsPath);
   serviceRepo.regenerateMarkdownPublic(state);
+  serviceRepo.activateRunPublic(state);
   deps.repo = serviceRepo;
   inv.featureDir = primaryFeatureDir;
 }

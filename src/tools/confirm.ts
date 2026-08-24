@@ -29,6 +29,8 @@ import type { PhaseHistoryEntry } from '../types/contracts.js';
 export interface ConfirmArgs {
   projectRoot: string;
   featureDir: string;
+  /** Confirm a gate on a specific run; defaults to current-run.json. */
+  runId?: string;
   /** Which gate to resolve. If absent, resolve the first pending. */
   gateId?: string;
   gate?: Gate;
@@ -76,11 +78,12 @@ export async function confirmFeatureDev(
     });
     const projectRoot = resolveProjectRoot({ explicit: args.projectRoot });
     const featureDir = validateFeatureDir(args.featureDir, projectRoot);
-    const repo = new StateRepository({ projectRoot, featureDir });
+    const repo = new StateRepository({ projectRoot, featureDir, runId: args.runId });
     if (!repo.exists()) {
       throw new NotFoundError('No execution-state.json', { path: repo.statePath });
     }
     const state = repo.read();
+    repo.activateRunPublic(state);
     const engine = new GateEngine(repo, true);
 
     let target: string | undefined = args.gateId;

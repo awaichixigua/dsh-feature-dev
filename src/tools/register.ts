@@ -136,6 +136,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition[] {
         // is constructed with it) and refuses to load the state file
         // without it; mark required.
         featureDir: { ...FEATURE_DIR, required: true },
+        runId: { type: 'string' },
         workflow: WORKFLOW,
         skipToPhase: { type: 'string' },
       },
@@ -151,6 +152,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition[] {
         // status is project-scoped; featureDir is optional. The
         // implementation falls back to projectRoot if absent.
         featureDir: FEATURE_DIR,
+        runId: { type: 'string' },
         includeMarkdown: { type: 'boolean' },
       },
       output: { schema: RESULT_SCHEMA, render: renderResult as never },
@@ -165,6 +167,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition[] {
         // confirm must find the pending confirmation, which is keyed
         // by featureDir; mark required.
         featureDir: { ...FEATURE_DIR, required: true },
+        runId: { type: 'string' },
         gateId: { type: 'string' },
         gate: { type: 'string' },
         choice: { type: 'string', required: true },

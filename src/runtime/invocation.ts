@@ -116,6 +116,8 @@ export function normalizeInvocation(
   if (opt.clarifyMode && opt.clarifyMode !== 'dialogue' && opt.clarifyMode !== 'batch') {
     throw new ValidationError(`Unknown clarifyMode: ${opt.clarifyMode}`);
   }
+  const skipUnitTests = parseBooleanOption(opt.skipUnitTests, 'options.skipUnitTests');
+  const legacyUnitTests = parseBooleanOption(opt.unitTests, 'options.unitTests');
 
   // paths
   const projectRoot = resolveProjectRoot({
@@ -134,9 +136,14 @@ export function normalizeInvocation(
 
   const options: InvocationOptions = {
     resume: !!opt.resume,
-    // Code-gen-tdd owns tests by default. Bugfix is intentionally faster and
-    // runs the test subagent only when the user explicitly opts in.
-    unitTests: opt.unitTests ?? workflow !== 'bugfix',
+    // Code-gen-tdd tests are opt-in solely through the command-facing
+    // --skip-unit-tests=false. Ignore its legacy unitTests field so a stale
+    // prompt cannot accidentally turn tests back on. Bugfix retains its
+    // existing tool-level unitTests option for compatibility.
+    unitTests: workflow === 'code-gen-tdd' || workflow === 'mrd-to-code'
+      ? skipUnitTests === false
+      : (skipUnitTests === undefined ? (legacyUnitTests ?? false) : !skipUnitTests),
+    ...(skipUnitTests !== undefined ? { skipUnitTests } : {}),
     generateUnitTestsOnly: !!opt.generateUnitTestsOnly,
     clarifyMode: opt.clarifyMode ?? 'dialogue',
     skipMrdClarify: !!opt.skipMrdClarify,
@@ -273,6 +280,12 @@ function applyKey(out: NormalizeInput, key: string, value: string): void {
     case 'clarify-mode':
       out.options = { ...(out.options ?? {}), clarifyMode: value as 'dialogue' | 'batch' };
       break;
+    case 'skip-unit-tests':
+      out.options = { ...(out.options ?? {}), skipUnitTests: parseBooleanOption(value, '--skip-unit-tests') };
+      break;
+    case 'unit-tests':
+      out.options = { ...(out.options ?? {}), unitTests: parseBooleanOption(value, '--unit-tests') };
+      break;
     case 'bug':
       out.bugDescription = value;
       break;
@@ -282,6 +295,14 @@ function applyKey(out: NormalizeInput, key: string, value: string): void {
     default:
       out.options = { ...(out.options ?? {}), [key]: value } as InvocationOptions;
   }
+}
+
+function parseBooleanOption(value: unknown, field: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new ValidationError(`${field} must be true or false`);
 }
 
 export { KNOWN_WORKFLOWS };

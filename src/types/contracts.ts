@@ -46,7 +46,10 @@ export interface FeatureDevInvocation {
 
 export interface InvocationOptions {
   resume: boolean;
+  /** Whether test generation and execution are enabled for this run. */
   unitTests: boolean;
+  /** Command-facing inverse of unitTests; false explicitly enables tests. */
+  skipUnitTests?: boolean;
   generateUnitTestsOnly: boolean;
   clarifyMode?: 'dialogue' | 'batch';
   /** Skip the MRD clarification dialogue (already answered elsewhere). */
@@ -157,7 +160,7 @@ export interface ExecutionState {
   bugClassification?: 'code_defect' | 'business_requirement';
   /** Persisted target directory for this bug's reports, relative to featureDir. */
   bugCaseDir?: string;
-  /** Bugfix-only: the user explicitly requested test generation/execution. */
+  /** Whether this run should generate and execute unit tests; survives resume. */
   unitTestsRequested?: boolean;
   currentPhase: string;
   phaseHistory: PhaseHistoryEntry[];

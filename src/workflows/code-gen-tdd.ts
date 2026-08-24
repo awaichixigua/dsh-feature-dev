@@ -111,6 +111,25 @@ async function driveTdd(
       return state;
     }
     const def = phases.find((p) => p.name === current);
+    // Existing runs can be resumed from a test phase after the setting was
+    // changed. Advance them without spawning a test-generating or test-running
+    // subagent when unit tests were not explicitly enabled for the run.
+    if (!inv.options.unitTests && isUnitTestPhase(current)) {
+      const next = nextPhaseFromResult('code-gen-tdd', current, {
+        status: 'pass',
+        summary: 'Unit tests skipped by configuration',
+        artifacts: [],
+        evidence: [],
+        changedFiles: [],
+      }, { skipCodeGenTddTests: true });
+      assertTransition('code-gen-tdd', current, next, {
+        lastResult: state.lastPhaseResult,
+        repairCount: state.repairCount,
+        maxRepairAttempts: deps.config.maxRepairAttempts,
+      });
+      state = deps.repo.transition(state, next);
+      continue;
+    }
     if (!def) {
       const next = nextPhaseFromResult('code-gen-tdd', current, {
         status: 'pass',
@@ -118,7 +137,7 @@ async function driveTdd(
         artifacts: [],
         evidence: [],
         changedFiles: [],
-      });
+      }, { skipCodeGenTddTests: !inv.options.unitTests });
       assertTransition('code-gen-tdd', current, next, {
         lastResult: state.lastPhaseResult,
         repairCount: state.repairCount,
@@ -134,7 +153,7 @@ async function driveTdd(
         artifacts: [],
         evidence: [],
         changedFiles: [],
-      });
+      }, { skipCodeGenTddTests: !inv.options.unitTests });
       state = deps.repo.transition(state, next);
       continue;
     }
@@ -162,7 +181,9 @@ async function driveTdd(
     }
     if (result.status === 'block' || result.status === 'failed') {
       // Let FSM pick the repair phase
-      const next = nextPhaseFromResult('code-gen-tdd', def.name, result);
+      const next = nextPhaseFromResult('code-gen-tdd', def.name, result, {
+        skipCodeGenTddTests: !inv.options.unitTests,
+      });
       if (next === def.name || next === 'BLOCKED') {
         return deps.repo.transition(state, 'BLOCKED');
       }
@@ -182,7 +203,9 @@ async function driveTdd(
       state = deps.repo.transition(state, next);
       continue;
     }
-    const next = nextPhaseFromResult('code-gen-tdd', def.name, result);
+    const next = nextPhaseFromResult('code-gen-tdd', def.name, result, {
+      skipCodeGenTddTests: !inv.options.unitTests,
+    });
     if (next === def.name) {
       return deps.repo.transition(state, 'BLOCKED');
     }
@@ -194,6 +217,12 @@ async function driveTdd(
     state = deps.repo.transition(state, next);
   }
   return deps.repo.transition(state, 'BLOCKED');
+}
+
+function isUnitTestPhase(phase: string): boolean {
+  return phase === 'PHASE4_TEST_GENERATION'
+    || phase === 'PHASE4_REPAIR'
+    || phase === 'PHASE5_TEST_EXECUTION';
 }
 
 async function runSubagentPhase(

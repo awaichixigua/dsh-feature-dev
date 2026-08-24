@@ -81,6 +81,14 @@ void test('nextPhaseFromResult: PHASE3 pass routes to PHASE4_TEST_GENERATION', (
   assert.equal(next, 'PHASE4_TEST_GENERATION');
 });
 
+void test('nextPhaseFromResult: code-gen-tdd skips test phases when unit tests are disabled', () => {
+  const result = { status: 'pass' as const, summary: 'review ok', artifacts: [], evidence: ['ok'], changedFiles: [] };
+  assert.equal(
+    nextPhaseFromResult('code-gen-tdd', 'PHASE3_REVIEW', result, { skipCodeGenTddTests: true }),
+    'PHASE6_SUMMARY'
+  );
+});
+
 void test('nextPhaseFromResult: implementation-plan order', () => {
   let p = getInitialPhase('implementation-plan');
   assert.equal(p, 'INITIALIZED');

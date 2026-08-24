@@ -17,6 +17,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runFeatureDev } from '../../src/tools/run.ts';
 import { statusFeatureDev } from '../../src/tools/status.ts';
+import { confirmFeatureDev } from '../../src/tools/confirm.ts';
+import { resumeFeatureDev } from '../../src/tools/resume.ts';
 
 const here = fileURLToPath(import.meta.url);
 const PKG_ROOT = resolve(here, '..', '..', '..');
@@ -51,6 +53,33 @@ void test('end-to-end code-gen-tdd: feature-dev runs to a terminal state', async
     // end states for this fixture because the gate engine raises a confirmation
     // after the test spec phase.
     assert.ok(['completed', 'blocked', 'running', 'paused', 'interrupted'].includes(run.data.status), run.data.status);
+
+    let state = JSON.parse(readFileSync(run.data.statePath, 'utf8')) as {
+      status: string;
+      pendingConfirmations: Array<{ id: string; options: string[] }>;
+      phaseHistory: Array<{ phase: string }>;
+      unitTestsRequested?: boolean;
+    };
+    if (state.pendingConfirmations.length > 0) {
+      const confirmation = state.pendingConfirmations[0]!;
+      const confirmed = await confirmFeatureDev(
+        { packageRoot: PKG_ROOT, importMetaUrl: import.meta.url },
+        { projectRoot: project, featureDir, gateId: confirmation.id, choice: confirmation.options[0] }
+      );
+      assert.equal(confirmed.ok, true, JSON.stringify(confirmed, null, 2));
+    }
+    if (state.status !== 'completed') {
+      const resumed = await resumeFeatureDev(
+        { packageRoot: PKG_ROOT, importMetaUrl: import.meta.url },
+        { projectRoot: project, featureDir }
+      );
+      assert.equal(resumed.ok, true, JSON.stringify(resumed, null, 2));
+    }
+    state = JSON.parse(readFileSync(run.data.statePath, 'utf8')) as typeof state;
+    assert.equal(state.unitTestsRequested, false);
+    assert.ok(!state.phaseHistory.some((entry) => entry.phase === 'PHASE4_TEST_GENERATION'));
+    assert.ok(!state.phaseHistory.some((entry) => entry.phase === 'PHASE5_TEST_EXECUTION'));
+    assert.ok(!existsSync(join(featureDir, 'ai', 'unit_test_report.md')));
 
     // State file exists
     assert.ok(existsSync(run.data.statePath));

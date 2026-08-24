@@ -35,7 +35,7 @@ sequenceDiagram
     U->>S: 触发 /implementation-plan
     S->>M: 注入 skills/implementation-plan/SKILL.md
     M->>T: workflow、projectRoot、featureDir、mrdUrl
-    T->>P: 创建或读取 ai/execution-state.json
+    T->>P: 创建 ai/runs/<runId>/ 或读取 current-run.json
     T->>R: runWorkflow(state, invocation)
     R->>W: implementationPlan(...)
     loop 每一个未完成阶段
@@ -111,7 +111,9 @@ TEST_SPEC → 确认 → IMPLEMENTATION → REVIEW
 - `revise`：回退到创建该门禁的阶段，下一次恢复会重跑该阶段。
 - `abort`：结束本次运行。
 
-会话在用户完成非 `abort` 确认后应立即调用 `feature_dev_resume` 继续，不应要求用户再发一条 `/resume`。若状态包含 `pendingMainAction`，主会话应完成其中指定的文件操作，再使用工具最新返回的正式 `featureDir` 恢复。若普通阶段返回 `block` 或 `failed`，线性工作流会处于 `BLOCKED`，恢复时会重跑最近的失败阶段。运行状态位于 `<featureDir>/ai/execution-state.json`，同目录还有便于人工阅读的 `execution-state.md` 与审计日志。
+会话在用户完成非 `abort` 确认后应立即调用 `feature_dev_resume` 继续，不应要求用户再发一条 `/resume`。若状态包含 `pendingMainAction`，主会话应完成其中指定的文件操作，再使用工具最新返回的正式 `featureDir` 恢复。若普通阶段返回 `block` 或 `failed`，线性工作流会处于 `BLOCKED`，恢复时会重跑最近的失败阶段。每次运行的状态位于 `<featureDir>/ai/runs/<runId>/`，`current-run.json` 指向默认运行；恢复、查询和确认可显式传入 `runId`。
+
+旧版平铺在 `ai/` 下的 `execution-state.json`、`execution-state.md` 与 `run-events.jsonl` 会在首次读取时复制到对应的 `runs/<runId>/`，完成无损迁移后发布 `current-run.json`。旧文件仅作为兼容快照，不再参与后续写入。
 
 ## 关键约束
 
