@@ -67,6 +67,10 @@ void test('end-to-end code-gen-tdd: feature-dev runs to a terminal state', async
         { projectRoot: project, featureDir, gateId: confirmation.id, choice: confirmation.options[0] }
       );
       assert.equal(confirmed.ok, true, JSON.stringify(confirmed, null, 2));
+      if (confirmed.ok) {
+        assert.ok(confirmed.data.resumed, 'accepting a test specification must resume code-gen-tdd');
+      }
+      state = JSON.parse(readFileSync(run.data.statePath, 'utf8')) as typeof state;
     }
     if (state.status !== 'completed') {
       const resumed = await resumeFeatureDev(

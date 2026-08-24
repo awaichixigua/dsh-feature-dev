@@ -22,9 +22,10 @@ import { shape, ok, fail, type ToolContext, type ToolResult } from './contract.j
 import { StateRepository } from '../runtime/state-repository.js';
 import { resolveProjectRoot, validateFeatureDir } from '../runtime/paths.js';
 import { GateEngine } from '../runtime/gate-engine.js';
-import { NotFoundError, ValidationError } from '../runtime/errors.js';
+import { ExecutorError, NotFoundError, ValidationError } from '../runtime/errors.js';
 import type { Gate } from '../runtime/gate-engine.js';
 import type { PhaseHistoryEntry } from '../types/contracts.js';
+import { resumeFeatureDev, type ResumeOutput } from './resume.js';
 
 export interface ConfirmArgs {
   projectRoot: string;
@@ -44,6 +45,8 @@ export interface ConfirmOutput {
   remainingPending: number;
   /** Side-effect: what changed about the run. */
   action: 'continue' | 'rewind' | 'abort' | 'soft';
+  /** Present when the acknowledgement immediately resumed the workflow. */
+  resumed?: Pick<ResumeOutput, 'status' | 'currentPhase' | 'featureDir' | 'statePath' | 'pendingConfirmations'>;
 }
 
 const SOFT_CHOICES = new Set(['continue', 'skip', 'update']);
@@ -164,6 +167,25 @@ export async function confirmFeatureDev(
       }
     }
 
+    // Test-spec acceptance is the only confirmation gate that immediately
+    // continues the TDD loop. Other gates can require a main-conversation
+    // action (for example MRD clarification), so retain their explicit
+    // resume behavior.
+    if (action === 'continue' && conf.gate === 'post_test_spec' && state.pendingConfirmations.length === 0) {
+      const resumed = await resumeFeatureDev(_ctx, {
+        projectRoot,
+        featureDir,
+        runId: state.runId,
+      });
+      if (!resumed.ok) {
+        throw new ExecutorError(
+          '确认已生效，但自动继续工作流失败：' + resumed.error.message,
+          { runId: state.runId, errorCode: resumed.error.code, details: resumed.error.details }
+        );
+      }
+      return finishOk(state, conf.gate, args.choice, action, resumed.data);
+    }
+
     return finishOk(state, conf.gate, args.choice, action);
   } catch (e) {
     return fail(e);
@@ -174,7 +196,8 @@ function finishOk(
   state: import('../types/contracts.js').ExecutionState,
   resolvedGate: string,
   choice: string,
-  action: ConfirmOutput['action']
+  action: ConfirmOutput['action'],
+  resumed?: ResumeOutput
 ): ToolResult<ConfirmOutput> {
   return ok({
     runId: state.runId,
@@ -182,6 +205,15 @@ function finishOk(
     choice,
     remainingPending: state.pendingConfirmations.length,
     action,
+    ...(resumed ? {
+      resumed: {
+        status: resumed.status,
+        currentPhase: resumed.currentPhase,
+        featureDir: resumed.featureDir,
+        statePath: resumed.statePath,
+        pendingConfirmations: resumed.pendingConfirmations,
+      },
+    } : {}),
   });
 }
 

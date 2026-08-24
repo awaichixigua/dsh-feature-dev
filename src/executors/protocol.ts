@@ -146,6 +146,10 @@ function buildPrompt(req: PhaseRequest, instructions: string): ContentBlock[] {
   context.push(`工作流：${req.workflow}`);
   context.push(`阶段：${req.phase}`);
   context.push(`项目根目录：${req.projectRoot}`);
+  const projectToolsIndexPath = findProjectToolsIndexPath(req.projectRoot);
+  context.push(projectToolsIndexPath
+    ? `项目级工具索引：${projectToolsIndexPath}`
+    : '项目级工具索引：未找到（已从项目根目录向上检查，无需读取）');
   if (req.featureDir) context.push(`需求目录：${req.featureDir}`);
   if (req.featureId) context.push(`需求 ID：${req.featureId}`);
   context.push('');
@@ -208,7 +212,7 @@ function buildRuleLoadingPolicy(req: PhaseRequest): string | undefined {
     '# 规则加载（必须执行）',
     '',
     '先使用文件读取工具逐份读取以下规则；不得凭记忆概括、跳过或要求父代理内联其正文。若任一文件不存在或无法读取，停止本阶段并返回 `status: "block"`，在 `blocker` 中写明路径和原因。',
-    `规则根目录：\`${join(packageRoot, 'rules')}\`。专属规则的 index 会列出按需主题规则；读取 index 后，必须按其适用条件继续读取对应主题。`,
+    `规则根目录：\`${join(packageRoot, 'rules')}\`。专属规则的 index 会列出按需主题规则；其中以 \`library/\` 开头的路径一律相对于该规则根目录（即 \`${join(packageRoot, 'rules', 'library')}\`），不得相对于 index 文件所在的 \`<agent-name>/\` 目录解析。读取 index 后，必须按其适用条件继续读取对应主题。`,
     '',
     '公共规则（所有 Agent 必读）：',
     ...commonRules.map((path) => `- 必读：\`${path}\``),
@@ -241,6 +245,18 @@ function collectMarkdownRuleFiles(directory: string): string[] {
       if (entry.isDirectory()) return collectMarkdownRuleFiles(path);
       return entry.isFile() && entry.name.toLowerCase().endsWith('.md') ? [path] : [];
     });
+}
+
+/** Find the closest monorepo-level project-tools index for a service repository. */
+function findProjectToolsIndexPath(projectRoot: string): string | undefined {
+  let current = projectRoot;
+  while (true) {
+    const candidate = join(current, 'arch-docs', 'project-tools-index.md');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
 }
 
 function readModelRole(instructions: string): ModelRole | undefined {

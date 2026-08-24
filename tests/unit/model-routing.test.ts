@@ -154,15 +154,19 @@ void test('SubagentExecutor injects rule paths for a packaged agent without inli
   const dir = mkdtempSync(join(tmpdir(), 'dsh-rule-policy-'));
   try {
     const promptPath = join(dir, 'agents', 'code-gen-tdd', 'code-impl.md');
+    const serviceRoot = join(dir, 'services', 'orders');
     mkdirSync(join(dir, 'agents', 'code-gen-tdd'), { recursive: true });
     mkdirSync(join(dir, 'rules', 'common'), { recursive: true });
     mkdirSync(join(dir, 'rules', 'code-impl', 'project'), { recursive: true });
+    mkdirSync(join(dir, 'arch-docs'), { recursive: true });
+    mkdirSync(serviceRoot, { recursive: true });
     writeFileSync(promptPath, '---\nname: code-impl\nmodel_role: coding\n---\n实现代码。\n');
     writeFileSync(join(dir, 'rules', 'common', 'agents.md'), '# KB rules\n');
     writeFileSync(join(dir, 'rules', 'common', 'timing-spec.md'), '# Timing rules\n');
     writeFileSync(join(dir, 'rules', 'common', 'error-format.md'), '# Error rules\n');
     writeFileSync(join(dir, 'rules', 'code-impl', 'index.md'), '# Agent rules\n');
     writeFileSync(join(dir, 'rules', 'code-impl', 'project', 'conventions.md'), '# Java rules\n');
+    writeFileSync(join(dir, 'arch-docs', 'project-tools-index.md'), '# Project tools\n');
     let captured: SubagentInvokeArgs | undefined;
     const port: SubagentPort = {
       async invoke(args) {
@@ -176,8 +180,11 @@ void test('SubagentExecutor injects rule paths for a packaged agent without inli
     const executor = new SubagentExecutor(port, { provider: 'spawn', parent: {} as Agent });
 
     await executor.run({
-      runId: 'run', workflow: 'code-gen-tdd', phase: 'PHASE2_IMPLEMENTATION', projectRoot: dir,
-      promptPath, inputs: {}, expectedArtifacts: [], mode: 'normal',
+      runId: 'run', workflow: 'code-gen-tdd', phase: 'PHASE2_IMPLEMENTATION', projectRoot: serviceRoot,
+      promptPath,
+      inputs: { kbContextPath: join(serviceRoot, 'app-knowledge-base', 'CONTEXT.md') },
+      expectedArtifacts: [],
+      mode: 'normal',
     });
 
     const ruleBlock = captured?.prompt[1] as { type: 'text'; text: string } | undefined;
@@ -186,10 +193,18 @@ void test('SubagentExecutor injects rule paths for a packaged agent without inli
     assert.match(ruleBlock?.text ?? '', /rules[\\/]common[\\/]timing-spec\.md/);
     assert.match(ruleBlock?.text ?? '', /rules[\\/]common[\\/]error-format\.md/);
     assert.match(ruleBlock?.text ?? '', /rules[\\/]code-impl[\\/]index\.md/);
+    assert.match(ruleBlock?.text ?? '', /不得相对于 index 文件所在/);
+    assert.match(ruleBlock?.text ?? '', /rules[\\/]library/);
     assert.doesNotMatch(ruleBlock?.text ?? '', /rules[\\/]code-impl[\\/]project[\\/]conventions\.md/);
     assert.doesNotMatch(ruleBlock?.text ?? '', /# Java rules/);
     const instructionsBlock = captured?.prompt[2] as { type: 'text'; text: string } | undefined;
     assert.match(instructionsBlock?.text ?? '', /实现代码/);
+    const contextBlock = captured?.prompt[3] as { type: 'text'; text: string } | undefined;
+    assert.match(contextBlock?.text ?? '', /项目级工具索引：[\s\S]*arch-docs[\\/]project-tools-index\.md/);
+    assert.ok(
+      (contextBlock?.text ?? '').includes(JSON.stringify(join(serviceRoot, 'app-knowledge-base', 'CONTEXT.md'))),
+      '上下文应保留服务目录下的 kbContextPath'
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

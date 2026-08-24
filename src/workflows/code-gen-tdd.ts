@@ -248,6 +248,9 @@ async function runSubagentPhase(
       phase: def.name,
       mode: def.isRepair ? 'incremental-fix' : 'normal',
       options: inv.options,
+      // Knowledge bases are service-scoped.  Unlike shared arch-docs, never
+      // search parent directories for this path.
+      kbContextPath: resolve(inv.projectRoot, 'app-knowledge-base', 'CONTEXT.md'),
       ...(def.subagent === 'tdd-test-spec'
         ? { testSpecTemplatePath: resolve(deps.ctx.packageRoot, 'templates', 'test_spec_template.md') }
         : {}),

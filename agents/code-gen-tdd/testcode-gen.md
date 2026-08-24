@@ -31,4 +31,4 @@ output: test files
 
 ## 项目级通用工具约束
 
-若 `<projectRoot>/arch-docs/project-tools-index.md` 存在，先读取索引。测试目标、测试规格、实现代码入口或待测试代码命中索引中的工具时，必须读取索引指定的 `arch-docs/project-tools/*.md` 详情，并遵守其中对测试入口、Mock 边界和禁止项的要求。索引不存在时静默跳过；命中工具的详情文件缺失或无法读取时，返回 `block` 并说明路径和解锁条件。
+优先读取阶段上下文中的“项目级工具索引”路径。该路径会从 `<projectRoot>/arch-docs/project-tools-index.md` 开始向父目录查找，以支持 `arch-docs` 位于多服务总览根目录的场景；若上下文标明未找到则静默跳过。测试目标、测试规格、实现代码入口或待测试代码命中索引中的工具时，必须读取索引指定的 `arch-docs/project-tools/*.md` 详情，并遵守其中对测试入口、Mock 边界和禁止项的要求。命中工具的详情文件缺失或无法读取时，返回 `block` 并说明路径和解锁条件。
