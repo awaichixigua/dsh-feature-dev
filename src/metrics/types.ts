@@ -70,6 +70,8 @@ export interface RunMetricsState {
   binding_id: string | null;
   project_root: string;
   feature_dir: string;
+  /** Resolved Git root for diff/snapshot collection; may differ from project_root. */
+  git_root?: string | null;
   /** Path to `<featureDir>/ai/runs/<runId>/execution-state.md`; null for bugfix runs. */
   execution_state_path: string | null;
   bugfix_report_path: string | null;

@@ -50,3 +50,15 @@ void test('scope (target_feature_id) participates in the identity', () => {
   const b = stateIdentity(projectRoot, featureDir, { type: 'feature', target_feature_id: 'F-2' }, 'code_gen');
   assert.notEqual(a, b);
 });
+
+void test('independently started workflow runs for the same feature hash differently', () => {
+  const a = stateIdentity(projectRoot, featureDir, scope, 'code_gen', null, null, 'run-A');
+  const b = stateIdentity(projectRoot, featureDir, scope, 'code_gen', null, null, 'run-B');
+  assert.notEqual(a, b);
+});
+
+void test('a resumed workflow run retains the same identity', () => {
+  const a = stateIdentity(projectRoot, featureDir, scope, 'code_gen', null, null, 'run-resume');
+  const b = stateIdentity(projectRoot, featureDir, scope, 'code_gen', null, null, 'run-resume');
+  assert.equal(a, b);
+});

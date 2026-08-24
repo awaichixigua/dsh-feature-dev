@@ -100,13 +100,20 @@ export function stateIdentity(
   scope: { type: string; target_feature_id: string | null },
   runType: 'code_gen' | 'bugfix' = 'code_gen',
   bugId: string | null = null,
-  bindingId: string | null = null
+  bindingId: string | null = null,
+  /**
+   * The persisted workflow run id.  It keeps independently started runs for
+   * the same feature apart while allowing a real resume (which preserves its
+   * run id) to reopen the same metrics state.
+   */
+  sessionId: string | null = null
 ): string {
   const parts: string[] = [projectRoot, featureDir, scope.type, scope.target_feature_id || 'full', runType];
   if (runType === 'bugfix') {
     parts.push(bugId || 'no-bug-id');
     if (bindingId) parts.push('binding', bindingId);
   }
+  if (sessionId) parts.push('session', sessionId);
   return createHash('sha256').update(parts.join('\0')).digest('hex');
 }
 
@@ -119,6 +126,7 @@ export function runStatePath(
     runType?: 'code_gen' | 'bugfix';
     bugId?: string | null;
     bindingId?: string | null;
+    sessionId?: string | null;
   }
 ): string {
   return join(
@@ -130,7 +138,8 @@ export function runStatePath(
       args.scope,
       args.runType ?? 'code_gen',
       args.bugId ?? null,
-      args.bindingId ?? null
+      args.bindingId ?? null,
+      args.sessionId ?? null
     )}.json`
   );
 }

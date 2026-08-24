@@ -178,6 +178,7 @@ export class RunMetricsReporter {
       runType: args.runType,
       bugId: args.bugId ?? null,
       bindingId: args.bindingId ?? null,
+      sessionId: args.sessionId ?? null,
     });
 
     if (existsSync(stateFile)) {
@@ -239,6 +240,7 @@ export class RunMetricsReporter {
       binding_id: args.bindingId ?? null,
       project_root: projectRoot,
       feature_dir: featureDir,
+      git_root: gitRoot,
       execution_state_path: args.runType === 'code_gen'
         ? (args.executionStatePath ?? join(featureDir, 'ai', 'execution-state.md'))
         : null,
@@ -355,9 +357,16 @@ export class RunMetricsReporter {
       refreshed.execution_state_path = args.executionStatePath;
     }
     refreshScopeDependencies(refreshed, args.featureDependencies ?? null);
-    const resultTree = safeSnapshot(refreshed.project_root);
-    const resultSha = safeHead(refreshed.project_root);
-    const headTree = safeHeadTree(refreshed.project_root);
+    // project_root can be a workspace that merely contains the real Git
+    // repository (feature_dir is usually inside that nested repository).
+    // Reuse the root resolved at start, and resolve it again for state files
+    // written before git_root was persisted.
+    const gitRoot = refreshed.git_root ?? findGitRoot(refreshed.feature_dir, refreshed.project_root);
+    const gitCwd = gitRoot ?? canonicalPath(refreshed.project_root);
+    refreshed.git_root = gitRoot;
+    const resultTree = safeSnapshot(gitCwd);
+    const resultSha = safeHead(gitCwd);
+    const headTree = safeHeadTree(gitCwd);
     const finishBaseline = resolveFinishBaseline({
       baseSha: refreshed.base_sha,
       baselineTreeSha: refreshed.baseline_tree_sha,
@@ -371,7 +380,7 @@ export class RunMetricsReporter {
     let lineChanges: LineChangeEntry[] | null = null;
     let schemaVersion = SCHEMA_VERSION;
     try {
-      totals = calculateMetrics(refreshed.project_root, finishBaseline.baselineTreeSha, resultTree);
+      totals = calculateMetrics(gitCwd, finishBaseline.baselineTreeSha, resultTree);
     } catch (e) {
       // numstat failure should not block the run — zero the totals and
       // downgrade the schema so the server still has a consistent shape.
@@ -389,7 +398,7 @@ export class RunMetricsReporter {
 
     if (this.cfg.lineChangesEnabled) {
       try {
-        lineChanges = calculateLineChanges(refreshed.project_root, finishBaseline.baselineTreeSha, resultTree);
+        lineChanges = calculateLineChanges(gitCwd, finishBaseline.baselineTreeSha, resultTree);
       } catch (e) {
         schemaVersion = SCHEMA_VERSION_FALLBACK;
         lineChanges = null;
@@ -530,7 +539,7 @@ function lineChangesEnabledFromEnv(): boolean {
 
 function loadActiveState(
   home: string,
-  args: { projectRoot: string; featureDir: string; runType: RunType; bugId?: string | null; bugCaseDir?: string | null; bindingId?: string | null; featureId?: string | null; featureSuffix?: string | null; featureDependencies?: string | string[] | null }
+  args: { projectRoot: string; featureDir: string; runType: RunType; bugId?: string | null; bugCaseDir?: string | null; bindingId?: string | null; sessionId?: string | null; featureId?: string | null; featureSuffix?: string | null; featureDependencies?: string | string[] | null }
 ): { stateFile: string; state: RunMetricsState } {
   // Same identity rule as startRun: do NOT canonicalise the identity
   // paths. realpathSync resolves Windows 8.3 short paths to the long
@@ -549,6 +558,7 @@ function loadActiveState(
     runType: args.runType,
     bugId: args.bugId ?? null,
     bindingId: args.bindingId ?? null,
+    sessionId: args.sessionId ?? null,
   });
   if (!existsSync(stateFile)) {
     throw new ReporterError('feature-dev metrics run has not been started', { stateFile });

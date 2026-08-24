@@ -20,7 +20,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { RunMetricsReporter } from '../../src/metrics/reporter.ts';
@@ -30,8 +31,13 @@ function makeTmp(): string {
   return mkdtempSync(join(tmpdir(), 'dsh-metrics-'));
 }
 
-function stateFileFor(home: string, projectRoot: string, featureDir: string): string {
-  return join(home, 'runs', `${stateIdentity(projectRoot, featureDir, { type: 'full', target_feature_id: null })}.json`);
+function stateFileFor(home: string, projectRoot: string, featureDir: string, sessionId?: string): string {
+  return join(home, 'runs', `${stateIdentity(projectRoot, featureDir, { type: 'full', target_feature_id: null }, 'code_gen', null, null, sessionId ?? null)}.json`);
+}
+
+function runGit(dir: string, args: string[]): void {
+  const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true });
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
 }
 
 void test('startRun writes state file with in_progress status', () => {
@@ -48,7 +54,7 @@ void test('startRun writes state file with in_progress status', () => {
     });
     assert.equal(result.resumed, false);
     assert.equal(result.status, 'in_progress');
-    const stateFile = stateFileFor(home, projectRoot, featureDir);
+    const stateFile = stateFileFor(home, projectRoot, featureDir, 'sess-1');
     assert.ok(existsSync(stateFile), `state file should exist at ${stateFile}`);
     const state = JSON.parse(readFileSync(stateFile, 'utf8'));
     assert.equal(state.run_id, result.run_id);
@@ -72,6 +78,26 @@ void test('startRun on existing in_progress state returns resumed=true', () => {
     const second = r.startRun({ projectRoot, featureDir, runType: 'code_gen' });
     assert.equal(second.resumed, true);
     assert.equal(second.run_id, first.run_id);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(projectRoot, { recursive: true, force: true });
+    rmSync(featureDir, { recursive: true, force: true });
+  }
+});
+
+void test('startRun isolates separate workflow run ids but resumes the same one', () => {
+  const home = makeTmp();
+  const projectRoot = makeTmp();
+  const featureDir = makeTmp();
+  try {
+    const r = new RunMetricsReporter({ metricsHome: home, lineChangesEnabled: false, reportUrl: 'http://localhost:0/dummy' });
+    const first = r.startRun({ projectRoot, featureDir, runType: 'code_gen', sessionId: 'workflow-1' });
+    const resumed = r.startRun({ projectRoot, featureDir, runType: 'code_gen', sessionId: 'workflow-1' });
+    const separate = r.startRun({ projectRoot, featureDir, runType: 'code_gen', sessionId: 'workflow-2' });
+    assert.equal(resumed.run_id, first.run_id);
+    assert.equal(resumed.resumed, true);
+    assert.notEqual(separate.run_id, first.run_id);
+    assert.equal(separate.resumed, false);
   } finally {
     rmSync(home, { recursive: true, force: true });
     rmSync(projectRoot, { recursive: true, force: true });
@@ -174,5 +200,48 @@ void test('reporter degrades gracefully when project is not a git repo', () => {
     rmSync(home, { recursive: true, force: true });
     rmSync(projectRoot, { recursive: true, force: true });
     rmSync(featureDir, { recursive: true, force: true });
+  }
+});
+
+void test('finishRun uses the nested Git root when projectRoot is only a workspace', async () => {
+  const home = makeTmp();
+  const workspace = makeTmp();
+  const repo = join(workspace, 'service');
+  const featureDir = join(repo, 'req', 'change');
+  try {
+    // projectRoot deliberately is not a Git tree; the changed file lives in
+    // the nested repository that contains featureDir.
+    mkdirSync(featureDir, { recursive: true });
+    runGit(repo, ['init', '-q']);
+    runGit(repo, ['config', 'user.email', 'test@example.com']);
+    runGit(repo, ['config', 'user.name', 'Test']);
+    mkdirSync(join(repo, 'src'), { recursive: true });
+    writeFileSync(join(repo, 'src', 'main.ts'), 'export const value = 1;\n');
+    runGit(repo, ['add', '.']);
+    runGit(repo, ['commit', '-qm', 'baseline']);
+
+    const originalFetch = globalThis.fetch;
+    const payloads: unknown[] = [];
+    globalThis.fetch = (async (_url, init) => {
+      payloads.push(JSON.parse(String(init?.body)));
+      return new Response('{"ok":true}', { status: 201 });
+    }) as typeof fetch;
+    try {
+      const r = new RunMetricsReporter({ metricsHome: home, lineChangesEnabled: false, reportUrl: 'http://localhost/dummy' });
+      r.startRun({ projectRoot: workspace, featureDir, runType: 'code_gen', sessionId: 'nested-run' });
+      writeFileSync(join(repo, 'src', 'main.ts'), 'export const value = 1;\nexport const next = 2;\n');
+      const result = await r.finishRun({ projectRoot: workspace, featureDir, runType: 'code_gen', sessionId: 'nested-run' });
+      const stateFile = stateFileFor(home, workspace, featureDir, 'nested-run');
+      const state = JSON.parse(readFileSync(stateFile, 'utf8'));
+      assert.equal(result.status, 'reported', JSON.stringify(state));
+      assert.equal(payloads.length, 1);
+      const payload = payloads[0] as { metrics: { ai_production_added_lines: number } };
+      assert.equal(payload.metrics.ai_production_added_lines, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(workspace, { recursive: true, force: true });
   }
 });
