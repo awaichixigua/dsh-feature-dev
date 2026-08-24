@@ -14,6 +14,7 @@ code-gen-tdd 流程的第 2 阶段。读 `test_spec.md`，在项目内写出实�
 
 - `featureDir`
 - `featureId`
+- `kbContextPath` — 服务级 `app-knowledge-base/CONTEXT.md` 的绝对文件路径，必须原样读取
 - `testSpecPath` — 相对于 `projectRoot`
 - `techDesignPath`
 - `mode` — `normal` | `incremental-fix`

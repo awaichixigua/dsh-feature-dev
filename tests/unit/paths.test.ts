@@ -15,6 +15,7 @@ import {
   isInside,
   resolveResourceBase,
   hasProjectMarker,
+  resolveServiceKbContextPath,
 } from '../../src/runtime/paths.ts';
 
 function makeProjectWithGit(): string {
@@ -143,4 +144,22 @@ void test('resolveMrdStagingDir: feature identity replaces the legacy URL hash',
   const b = resolveMrdStagingDir(root, 'https://example.com/share_doc/?token=two', name);
   assert.equal(a, join(root, '.tmp', name));
   assert.equal(a, b);
+});
+
+void test('resolveServiceKbContextPath: uses the service owning req instead of aggregate projectRoot', () => {
+  const aggregate = mkdtempSync(join(tmpdir(), 'dsh-kb-paths-'));
+  try {
+    const service = join(aggregate, 'engi-common');
+    const featureDir = join(service, 'req', '2.0.0_103111_fastjson-to-jackson');
+    mkdirSync(join(service, 'app-knowledge-base'), { recursive: true });
+    mkdirSync(featureDir, { recursive: true });
+    writeFileSync(join(service, 'app-knowledge-base', 'CONTEXT.md'), '# service KB');
+
+    assert.equal(
+      resolveServiceKbContextPath(featureDir, aggregate),
+      join(service, 'app-knowledge-base', 'CONTEXT.md')
+    );
+  } finally {
+    rmSync(aggregate, { recursive: true, force: true });
+  }
 });

@@ -29,6 +29,7 @@ import { assertTransition, nextPhaseFromResult } from '../runtime/state-machine.
 import { validateArtifacts, type ArtifactSpec } from '../runtime/artifact-validator.js';
 import { GateEngine, type Gate } from '../runtime/gate-engine.js';
 import { resolve } from 'node:path';
+import { resolveServiceKbContextPath } from '../runtime/paths.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { runPhaseSubagent } from './subagent-runner.js';
 
@@ -233,6 +234,10 @@ async function runSubagentPhase(
 ): Promise<PhaseResult> {
   // Build the PhaseRequest
   const promptPath = resolveAgentPromptPath(deps.ctx.packageRoot, 'code-gen-tdd', def.subagent);
+  const kbContextPath = resolveServiceKbContextPath(
+    inv.featureDir ?? inv.projectRoot,
+    inv.projectRoot
+  );
   const req: PhaseRequest = {
     runId: state.runId,
     workflow: 'code-gen-tdd',
@@ -250,7 +255,7 @@ async function runSubagentPhase(
       options: inv.options,
       // Knowledge bases are service-scoped.  Unlike shared arch-docs, never
       // search parent directories for this path.
-      kbContextPath: resolve(inv.projectRoot, 'app-knowledge-base', 'CONTEXT.md'),
+      kbContextPath,
       ...(def.subagent === 'tdd-test-spec'
         ? { testSpecTemplatePath: resolve(deps.ctx.packageRoot, 'templates', 'test_spec_template.md') }
         : {}),

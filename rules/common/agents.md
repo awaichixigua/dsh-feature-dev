@@ -5,9 +5,11 @@
 
 | 层级 | 时机 | 注入内容 |
 |---|---|---|
-| L0（CONTEXT） | 总是 | 读取 `<kbContextPath>/CONTEXT.md`（不超过 200 行） |
+| L0（CONTEXT） | 总是 | 读取 `PhaseRequest.inputs.kbContextPath` 指向的文件（不超过 200 行） |
 | L1（按 agent） | 按需 | 至多读取下列其中**一个**：`01_业务与领域知识层.md` / `02_架构与设计层.md` / `03_核心流程与逻辑层.md` |
 | L2（详细文档） | 永不允许 | 单个阶段内不得读取超过一份详细文档 |
+
+`kbContextPath` 是服务级 `app-knowledge-base/CONTEXT.md` 的绝对文件路径，不是目录。必须原样读取：不得再次拼接 `CONTEXT.md`，不得按 `projectRoot` 自行重算，也不得因为项目级 `arch-docs` 位于父目录而向父目录搜索或 Glob KB。
 
 | Agent | L1 文件（按需） | 触发时机 |
 |---|---|---|

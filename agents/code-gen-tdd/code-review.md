@@ -13,6 +13,7 @@ output: code-review.md
 ## 输入
 
 - `featureDir`
+- `kbContextPath` — 服务级 `app-knowledge-base/CONTEXT.md` 的绝对文件路径，必须原样读取
 - `diffRange` — 例如 `HEAD~1..HEAD` 或分支名
 - `testSpecPath`
 - `techDesignPath`

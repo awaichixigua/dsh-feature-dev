@@ -150,6 +150,9 @@ function buildPrompt(req: PhaseRequest, instructions: string): ContentBlock[] {
   context.push(projectToolsIndexPath
     ? `项目级工具索引：${projectToolsIndexPath}`
     : '项目级工具索引：未找到（已从项目根目录向上检查，无需读取）');
+  if (typeof req.inputs.kbContextPath === 'string') {
+    context.push('服务级 KB CONTEXT（必须使用此精确文件路径）：' + req.inputs.kbContextPath);
+  }
   if (req.featureDir) context.push(`需求目录：${req.featureDir}`);
   if (req.featureId) context.push(`需求 ID：${req.featureId}`);
   context.push('');

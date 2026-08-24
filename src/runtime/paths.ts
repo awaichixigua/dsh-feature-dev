@@ -43,6 +43,36 @@ export function resolveMrdStagingDir(projectRoot: string, mrdUrl: string, featur
   return resolve(projectRoot, '.tmp', `mrdoc-${fingerprint}`);
 }
 
+/**
+ * Resolve the service-scoped knowledge-base entry for a feature.
+ *
+ * In a multi-service workspace projectRoot can be the aggregate repository,
+ * while featureDir is <service>/req/<feature>. KB lookup must stop at that
+ * service root and must not drift to an aggregate-level app-knowledge-base.
+ */
+export function resolveServiceKbContextPath(featureDir: string, projectRoot: string): string {
+  const feature = resolve(featureDir);
+  const project = resolve(projectRoot);
+  let current = dirname(feature);
+  let serviceRoot: string | undefined;
+
+  while (isInside(current, project)) {
+    if (basename(current).toLowerCase() === 'req') {
+      serviceRoot = dirname(current);
+      break;
+    }
+    if (existsSync(resolve(current, '.git'))) {
+      serviceRoot = current;
+      break;
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return resolve(serviceRoot ?? project, 'app-knowledge-base', 'CONTEXT.md');
+}
+
 const PROJECT_MARKERS = ['.git', 'package.json'];
 
 /**

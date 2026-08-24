@@ -201,6 +201,7 @@ void test('SubagentExecutor injects rule paths for a packaged agent without inli
     assert.match(instructionsBlock?.text ?? '', /实现代码/);
     const contextBlock = captured?.prompt[3] as { type: 'text'; text: string } | undefined;
     assert.match(contextBlock?.text ?? '', /项目级工具索引：[\s\S]*arch-docs[\\/]project-tools-index\.md/);
+    assert.match(contextBlock?.text ?? '', /服务级 KB CONTEXT（必须使用此精确文件路径）/);
     assert.ok(
       (contextBlock?.text ?? '').includes(JSON.stringify(join(serviceRoot, 'app-knowledge-base', 'CONTEXT.md'))),
       '上下文应保留服务目录下的 kbContextPath'

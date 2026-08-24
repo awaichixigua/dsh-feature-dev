@@ -13,6 +13,7 @@ output: test files
 ## 输入
 
 - `featureDir`
+- `kbContextPath` — 服务级 `app-knowledge-base/CONTEXT.md` 的绝对文件路径，必须原样读取
 - `testSpecPath`
 - `codeChangedFiles`
 - `mode` — `normal` | `incremental-fix`
