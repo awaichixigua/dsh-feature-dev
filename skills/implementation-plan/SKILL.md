@@ -1,14 +1,14 @@
 ---
 name: implementation-plan
-description: 从 MRD 生成 PRD 和技术方案；仅产出文档，不生成业务代码。触发词：生成 PRD、生成技术方案、生成实施方案。
+description: 从 MRD 或直接输入的需求生成 PRD 和技术方案；仅产出文档，不生成业务代码。触发词：生成 PRD、生成技术方案、生成实施方案。
 user-invocable: true
 disable-model-invocation: false
-argument-hint: <MRD URL> --feature-dir <需求目录名> [--clarify-mode=dialogue|batch]
+argument-hint: <MRD URL 或需求描述> --feature-dir <需求目录名> [--clarify-mode=dialogue|batch]
 ---
 
 # implementation-plan
 
-`--feature-dir` 是启动 `implementation-plan` 的必填参数，且必须是 `{版本号}_{需求编号}_{中文需求标题}` 形式的正式需求目录名。MRD URL 会先抓取到 `<projectRoot>/.tmp/<feature-dir 的目录名>`；这里是抓取、MRD 解析和服务路由的临时运行目录，不代表省略 `featureDir`，也不得在启动前手工创建正式 `req/` 目录。既然已提供 `featureDir`，运行目录不再使用 MRD URL hash。服务路由和需求分支门禁通过后，文档和运行状态才沉淀到 `<主服务仓库>/req/<feature-dir 的目录名>`；随后由主会话在该服务仓库内完成 MRD 澄清，并将其 `app-knowledge-base/` 作为交叉验证知识库。
+`--feature-dir` 是启动 `implementation-plan` 的必填参数，且必须是 `{版本号}_{需求编号}_{中文需求标题}` 形式的正式需求目录名。MRD URL 或直接输入的需求会先暂存在 `<projectRoot>/.tmp/<feature-dir 的目录名>`；这里是来源整理和服务路由的临时运行目录，不代表省略 `featureDir`，也不得在启动前手工创建正式 `req/` 目录。既然已提供 `featureDir`，运行目录不再使用 MRD URL hash。服务路由和需求分支门禁通过后，文档和运行状态才沉淀到 `<主服务仓库>/req/<feature-dir 的目录名>`；随后由主会话在该服务仓库内完成需求澄清，并将其 `app-knowledge-base/` 作为交叉验证知识库。
 
 ## 需求分支准备
 
@@ -26,11 +26,12 @@ argument-hint: <MRD URL> --feature-dir <需求目录名> [--clarify-mode=dialogu
 
 写入完成后，立即以工具最新返回的 `featureDir`（即主服务仓库中的正式需求目录，而不是 `.tmp` hash 目录或最初传入的路径）和相同的 `projectRoot` 调用 `feature_dev_resume`。恢复过程只校验 `mrd-clarified.md`，不会再启动澄清子代理；校验通过后直接进入 PRD 阶段。
 
-适用于已有 MRD、需要形成可评审 PRD 与技术方案的需求。代码实现使用 `/code-gen-tdd`。
+适用于已有 MRD 或可直接描述、需要形成可评审 PRD 与技术方案的需求。直接输入需求时，不会访问 MRDoc；内容会先保存为 `mrd-original.md`，随后沿用相同的服务路由、澄清和文档生成流程。代码实现使用 `/code-gen-tdd`。
 
 ```text
 /implementation-plan https://example.com/share_doc/?token=xxx --feature-dir req/create-order
 /implementation-plan https://example.com/share_doc/?token=xxx --feature-dir req/create-order --clarify-mode=batch
+/implementation-plan "用户可按订单编号查询物流状态，并查看最新节点" --feature-dir req/query-logistics
 ```
 
 调用 `feature_dev_run`，参数为：
@@ -40,7 +41,8 @@ argument-hint: <MRD URL> --feature-dir <需求目录名> [--clarify-mode=dialogu
   "workflow": "implementation-plan",
   "projectRoot": "<业务项目根目录>",
   "featureDir": "<需求目录>",
-  "mrdUrl": "<MRD URL>",
+  "mrdUrl": "<MRD URL；与 rawUserRequest 二选一>",
+  "rawUserRequest": "<直接输入的需求；与 mrdUrl 二选一>",
   "options": { "clarifyMode": "dialogue 或 batch" }
 }
 ```

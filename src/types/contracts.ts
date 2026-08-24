@@ -31,13 +31,13 @@ export interface FeatureDevInvocation {
   featureId?: string;
   /** Stop after reaching this target. e.g. "prd" | "tech" | "phase3" | "code" */
   target?: string;
-  /** For MRD flow: the MRDoc share URL or local path. */
+  /** Optional MRDoc share URL or local path for an implementation plan. */
   mrdUrl?: string;
   /** For bugfix flow: the user-supplied bug description. */
   bugDescription?: string;
   /** Optional numeric bugfix case id, e.g. `13`. */
   bugCaseId?: string;
-  /** Original user request, preserved for audit / display. */
+  /** Original user request; implementation-plan uses it as direct requirement input when mrdUrl is absent. */
   rawUserRequest?: string;
   options: InvocationOptions;
   /** Optional model role overrides for this run. */

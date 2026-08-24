@@ -57,6 +57,7 @@ MRD URL 的抓取、解析和服务路由会先在 `.tmp/<featureDir 的目录�
 
 ```text
 /implementation-plan <MRD URL> --feature-dir req/2.0.0_103111_fastjson替换为jackson
+/implementation-plan "用户可按订单编号查询物流状态，并查看最新节点" --feature-dir req/2.0.0_103112_物流状态查询
 /code-gen-tdd --feature-dir req/create-order
 /archive --feature-dir req/create-order
 ```

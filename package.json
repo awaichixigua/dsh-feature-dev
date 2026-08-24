@@ -1,6 +1,6 @@
 {
   "name": "@your-org/dsh-feature-dev",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native MRD-to-code workflow bundle for DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",
@@ -13,6 +13,7 @@
   },
   "files": [
     "lib",
+    "CHANGELOG.md",
     "cordis.patch.yml",
     "skills",
     "agents",

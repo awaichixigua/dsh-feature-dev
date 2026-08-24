@@ -125,6 +125,35 @@ void test('end-to-end implementation-plan: produces mrd-original and confirms pr
   }
 });
 
+void test('implementation-plan accepts direct requirement input without fetching MRDoc', async () => {
+  const project = makeProject();
+  try {
+    const featureDir = join(project, 'req', 'direct-plan-test');
+    const requirement = '支持按订单编号查询物流状态，并展示最新物流节点';
+    const run = await runFeatureDev(
+      { packageRoot: PKG_ROOT, importMetaUrl: import.meta.url },
+      {
+        workflow: 'implementation-plan',
+        projectRoot: project,
+        featureDir,
+        rawUserRequest: requirement,
+        options: { resume: false, unitTests: false, generateUnitTestsOnly: false },
+      }
+    );
+    assert.equal(run.ok, true, JSON.stringify(run, null, 2));
+    if (!run.ok) return;
+    assert.match(readFileSync(join(run.data.featureDir, 'mrd-original.md'), 'utf8'), new RegExp(requirement));
+    const source = JSON.parse(readFileSync(join(run.data.featureDir, '.tmp', 'mrd-source.json'), 'utf8')) as {
+      sourceType: string;
+      sha256: string;
+    };
+    assert.equal(source.sourceType, 'direct-input');
+    assert.match(source.sha256, /^[a-f0-9]{64}$/);
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+  }
+});
+
 void test('state.json contains all expected top-level fields', async () => {
   const project = makeProject();
   try {

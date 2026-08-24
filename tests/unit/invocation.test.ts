@@ -133,6 +133,27 @@ void test('parseSkillArgv: extracts clarify-mode', () => {
   assert.equal(r.options?.clarifyMode, 'batch');
 });
 
+void test('parseSkillArgv: accepts inline implementation-plan requirement', () => {
+  const r = parseSkillArgv('implementation-plan "支持按订单编号查询物流状态" --feature-dir req/query-logistics');
+  assert.equal(r.workflow, 'implementation-plan');
+  assert.equal(r.mrdUrl, undefined);
+  assert.equal(r.rawUserRequest, '支持按订单编号查询物流状态');
+});
+
+void test('normalizeInvocation: implementation-plan accepts direct requirement without mrdUrl', () => {
+  const inv = normalizeInvocation(
+    {
+      workflow: 'implementation-plan',
+      projectRoot: process.cwd(),
+      featureDir: process.cwd(),
+      rawUserRequest: '支持按订单编号查询物流状态',
+    },
+    { importMetaUrl: import.meta.url, cwd: process.cwd(), defaultWorkflow: 'implementation-plan' }
+  );
+  assert.equal(inv.mrdUrl, undefined);
+  assert.equal(inv.rawUserRequest, '支持按订单编号查询物流状态');
+});
+
 void test('parseSkillArgv: --skip-unit-tests=false enables unit tests', () => {
   const r = parseSkillArgv('code-gen-tdd --feature-dir req/foo --skip-unit-tests=false');
   assert.equal(r.options?.skipUnitTests, false);

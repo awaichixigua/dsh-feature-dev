@@ -227,7 +227,14 @@ export function parseSkillArgv(argv: string): NormalizeInput {
       out.bugDescription = first;
     }
   }
-  if (positional.length > 1) {
+  if (out.workflow === 'implementation-plan' && !out.mrdUrl) {
+    // The implementation-plan skill accepts the positional text as an
+    // inline requirement. This is intentionally kept as one string so the
+    // workflow can persist it verbatim as its source artifact.
+    out.rawUserRequest = positional
+      .filter((item) => item.toLowerCase() !== 'implementation-plan')
+      .join(' ');
+  } else if (positional.length > 1) {
     out.rawUserRequest = positional.slice(1).join(' ');
   }
   if (!out.workflow) {

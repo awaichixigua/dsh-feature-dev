@@ -76,15 +76,21 @@ export async function runFeatureDev(
     if (!KNOWN_WORKFLOWS.has(inv.workflow)) {
       throw new Error(`Unknown workflow: ${inv.workflow}`);
     }
-    // Keep the legacy document lifecycle: URL content first goes to a
-    // deterministic hash directory.  SERVICE_ROUTER and BRANCH_GATE later
-    // settle it into <service-repo>/req/<feature-name>.
-    if ((inv.workflow === 'implementation-plan' || inv.workflow === 'mrd-to-code') && inv.mrdUrl) {
+    // Keep the document lifecycle for both source modes: an MRDoc URL or
+    // direct requirement text first goes to a deterministic staging
+    // directory. SERVICE_ROUTER and BRANCH_GATE later settle it into
+    // <service-repo>/req/<feature-name>.
+    const hasPlanningSource = Boolean(inv.mrdUrl || inv.rawUserRequest?.trim());
+    if ((inv.workflow === 'implementation-plan' || inv.workflow === 'mrd-to-code') && hasPlanningSource) {
       if (!inv.featureDir) {
         throw new Error('implementation-plan requires featureDir so the routed service requirement directory can be named');
       }
       inv.featureId ??= basename(inv.featureDir);
-      inv.featureDir = resolveMrdStagingDir(inv.projectRoot, inv.mrdUrl, inv.featureId);
+      inv.featureDir = resolveMrdStagingDir(
+        inv.projectRoot,
+        inv.mrdUrl ?? inv.rawUserRequest ?? 'direct-requirement',
+        inv.featureId
+      );
     }
     const repo = new StateRepository({
       projectRoot: inv.projectRoot,

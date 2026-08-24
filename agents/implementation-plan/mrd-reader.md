@@ -8,7 +8,7 @@ output: mrd-original.md
 
 # Agent: mrd-reader
 
-抓取 MRDoc 分享链接，从内嵌的 `<textarea>` 提取 Markdown，落地原始 MRD 和元数据文件。
+仅在提供 `mrdUrl` 时抓取 MRDoc 分享链接，从内嵌的 `<textarea>` 提取 Markdown，落地原始 MRD 和元数据文件。直接输入需求时，此子代理不会被启动；工作流会在本地写入同样的 `mrd-original.md`。
 
 ## 输入
 

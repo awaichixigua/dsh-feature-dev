@@ -23,7 +23,7 @@
     "featureDir": { "type": "string" },
     "featureId": { "type": "string" },
     "target": { "type": "string" },
-    "mrdUrl": { "type": "string", "format": "uri" },
+    "mrdUrl": { "type": "string", "format": "uri", "description": "implementation-plan 可选；未提供时使用 rawUserRequest 作为直接需求" },
     "bugDescription": { "type": "string" },
     "rawUserRequest": { "type": "string" },
     "options": {

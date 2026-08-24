@@ -19,7 +19,8 @@ import type { RunnerDeps } from './runner.js';
 import { drivePhases, type PhaseSpec } from './phase-driver.js';
 import { GateEngine } from '../runtime/gate-engine.js';
 import { basename, isAbsolute, join, resolve } from 'node:path';
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { StateRepository } from '../runtime/state-repository.js';
 import { isInside } from '../runtime/paths.js';
 import { defaultRepoPathProbe, findDirectGitReposUnder, looksLikeGitRepository, type RepoPathProbe } from '../runtime/paths.js';
@@ -38,7 +39,7 @@ export async function implementationPlan(
       name: 'MRD_READER',
       artifacts: (current) => [{ path: `${current.featureDir}/mrd-original.md`, minSize: 1 }],
       subagent: 'mrd-reader',
-      run: makeRunner('mrd-reader'),
+      run: readRequirementSource,
     },
     {
       name: 'SERVICE_ROUTER',
@@ -98,6 +99,48 @@ export async function implementationPlan(
     },
   ];
   return drivePhases(state, inv, deps, engine, 'implementation-plan', phases);
+}
+
+/**
+ * Materialize inline requirement text locally. This is the direct-input
+ * alternative to MRDoc fetching and deliberately does not spawn mrd-reader.
+ * Downstream routing and document phases continue to consume the same
+ * mrd-original.md contract regardless of where the requirement came from.
+ */
+async function readRequirementSource(
+  state: ExecutionState,
+  inv: FeatureDevInvocation,
+  deps: RunnerDeps
+): Promise<PhaseResult> {
+  const requirement = inv.rawUserRequest?.trim();
+  if (!requirement) {
+    if (inv.mrdUrl) return makeRunner('mrd-reader')(state, inv, deps);
+    return {
+      status: 'block',
+      summary: '缺少需求来源',
+      artifacts: [],
+      evidence: ['requirement_source:missing'],
+      changedFiles: [],
+      blocker: '请提供 MRDoc 地址或直接输入需求内容后重新运行。',
+    };
+  }
+
+  const stagingFeatureDir = resolve(inv.featureDir ?? state.featureDir);
+  const originalPath = resolve(stagingFeatureDir, 'mrd-original.md');
+  const sourcePath = resolve(stagingFeatureDir, '.tmp', 'mrd-source.json');
+  mkdirSync(resolve(stagingFeatureDir, '.tmp'), { recursive: true });
+  writeFileSync(originalPath, `# 原始需求\n\n${requirement}\n`, 'utf8');
+  writeFileSync(sourcePath, JSON.stringify({
+    sourceType: 'direct-input',
+    sha256: createHash('sha256').update(requirement).digest('hex'),
+  }, null, 2) + '\n', 'utf8');
+  return {
+    status: 'pass',
+    summary: '已将直接输入的需求保存为原始需求文档',
+    artifacts: [originalPath, sourcePath],
+    evidence: ['requirement_source:direct-input'],
+    changedFiles: [originalPath, sourcePath],
+  };
 }
 
 interface RoutedApps {
@@ -198,6 +241,7 @@ function makeRunner(subagent: string) {
           featureId: inv.featureId,
         }),
         mrdUrl: inv.mrdUrl,
+        rawUserRequest: inv.rawUserRequest,
         ...(subagent === 'app-router'
           ? { mrdOriginalPath: resolve(inv.featureDir ?? inv.projectRoot, 'mrd-original.md') }
           : {}),
