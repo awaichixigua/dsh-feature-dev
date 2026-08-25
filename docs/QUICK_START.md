@@ -22,11 +22,16 @@ vi /root/.dsh/profiles/web/pnpm-workspace.yaml
 在打开的 `pnpm-workspace.yaml` 的 `allowBuilds:` 下加入以下条目，并保留文件既有内容。Git 托管依赖必须使用 pnpm 输出的完整依赖定位符，整个 YAML 键必须加引号：
 
 ```yaml
-allowBuilds:
-  '@engios/dsh-feature-dev@git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#19e9c727b2c4d59bf8f43c9702a4413d773a28d9': true
-```
+packages:
+  - .
 
-上面的提交哈希对应 `v0.1.8`。升级到其他版本时，如果 pnpm 报 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`，请将该键替换为错误信息中 `allowBuilds` 下打印的完整键。
+nodeLinker: hoisted
+autoInstallPeers: false
+allowBuilds:
+  node-pty: false
+  dsh-plugin-search: true
+  '@engios/dsh-feature-dev@git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git': true
+```
 
 然后安装指定版本（推荐，便于回归和回滚）：
 
@@ -47,6 +52,18 @@ dsh plugin --profile web add D:\ai\dsh-feature-dev
 ```
 
 开发修改后重新执行 `pnpm build`，再按 DSH 的插件管理流程刷新或重新安装。本地验证、私有仓库认证和其他分发方式见 [PUBLISH.md](PUBLISH.md)。
+
+## 建议配套安装的插件
+```powershell
+dsh plugin --profile web add github:shinjiyu/dsh-plugin-search   ## 修复dsh缺陷，web-search强依赖官方api-key
+```
+
+```powershell
+# 侧边栏优化，支持查看agent 浏览文件
+dsh plugin --profile web add dsh-better-sidebar@latest   
+cd ~/.dsh/profiles/web && pnpm approve-builds --all      
+dsh plugin --profile web add dsh-better-sidebar@latest   
+```
 
 ## 可用 Skill
 

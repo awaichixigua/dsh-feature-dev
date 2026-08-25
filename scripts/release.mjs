@@ -25,12 +25,33 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
 function run(command, args) {
   console.log(`\n> ${command} ${args.join(' ')}`);
   if (process.platform === 'win32' && command === PNPM_COMMAND) {
-    // pnpm.cmd is a batch launcher. These arguments are fixed script commands,
-    // so running them through cmd.exe avoids the .cmd spawn limitation safely.
-    execSync(`pnpm ${args.join(' ')}`, { stdio: 'inherit', cwd: ROOT });
+    // Resolve to pnpm's absolute path on first use. PowerShell and cmd.exe
+    // inherit different PATHs, so spawning `pnpm` by name from inside
+    // execSync can hit ENOENT even when pnpm is installed globally.
+    execFileSync(resolvePnpm(), args, { stdio: 'inherit', cwd: ROOT });
     return;
   }
   execFileSync(command, args, { stdio: 'inherit', cwd: ROOT });
+}
+
+let cachedPnpmPath = null;
+function resolvePnpm() {
+  if (cachedPnpmPath) return cachedPnpmPath;
+  if (process.platform !== 'win32') {
+    cachedPnpmPath = 'pnpm';
+    return cachedPnpmPath;
+  }
+  try {
+    const out = execFileSync('where', ['pnpm'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const first = out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+    cachedPnpmPath = first || 'pnpm.cmd';
+  } catch {
+    cachedPnpmPath = 'pnpm.cmd';
+  }
+  return cachedPnpmPath;
 }
 
 function readCommand(command, args) {

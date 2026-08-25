@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepare": "pnpm build",
+    "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ tests/",
     "test": "node --test --import tsx tests/unit/*.test.ts tests/contract/*.test.ts",
