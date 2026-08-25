@@ -25,10 +25,12 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
 function run(command, args) {
   console.log(`\n> ${command} ${args.join(' ')}`);
   if (process.platform === 'win32' && command === PNPM_COMMAND) {
-    // Resolve to pnpm's absolute path on first use. PowerShell and cmd.exe
-    // inherit different PATHs, so spawning `pnpm` by name from inside
-    // execSync can hit ENOENT even when pnpm is installed globally.
-    execFileSync(resolvePnpm(), args, { stdio: 'inherit', cwd: ROOT });
+    // .cmd files cannot be spawned directly by Node on Windows. Resolve a
+    // command-script shim and invoke it through cmd.exe instead.
+    execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', resolvePnpm(), ...args], {
+      stdio: 'inherit',
+      cwd: ROOT,
+    });
     return;
   }
   execFileSync(command, args, { stdio: 'inherit', cwd: ROOT });
@@ -46,8 +48,11 @@ function resolvePnpm() {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    const first = out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
-    cachedPnpmPath = first || 'pnpm.cmd';
+    const paths = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    // `where pnpm` commonly returns an extensionless PowerShell shim before
+    // pnpm.cmd. Node's spawn cannot execute that shim directly, so choose a
+    // command-script shim explicitly.
+    cachedPnpmPath = paths.find((candidate) => /\.cmd$/i.test(candidate)) || 'pnpm.cmd';
   } catch {
     cachedPnpmPath = 'pnpm.cmd';
   }
