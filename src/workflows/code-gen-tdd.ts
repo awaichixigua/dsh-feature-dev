@@ -28,8 +28,11 @@ import type { RunnerDeps } from './runner.js';
 import { assertTransition, nextPhaseFromResult } from '../runtime/state-machine.js';
 import { validateArtifacts, type ArtifactSpec } from '../runtime/artifact-validator.js';
 import { GateEngine, type Gate } from '../runtime/gate-engine.js';
-import { basename, resolve } from 'node:path';
-import { resolveServiceKbContextPath } from '../runtime/paths.js';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { basename, isAbsolute, resolve } from 'node:path';
+import { isInside, resolveServiceKbContextPath } from '../runtime/paths.js';
 import { resolveAgentPromptPath } from './agent-prompt-path.js';
 import { runPhaseSubagent } from './subagent-runner.js';
 import {
@@ -46,6 +49,13 @@ interface PhaseDef {
   gate?: Gate;
   subagent: string;
   isRepair?: boolean;
+}
+
+interface ReviewScope {
+  /** Absolute paths are used so multi-service runs cannot resolve a file in the wrong repository. */
+  changedFiles: string[];
+  source: 'previous-phase' | 'git-working-tree' | 'empty';
+  lineMode: 'added-lines-only';
 }
 
 export async function codeGenTdd(
@@ -293,6 +303,7 @@ async function runSubagentForTarget(
       ...(feature ? { feature } : {}),
       ...(featureMapPath ? { featureMapPath: resolve(target.featureDir, 'feature-map.json') } : {}),
       testSpecPath: featureArtifactPath(target, selectedFeatureId, 'test_spec.md'),
+      techDesignPath: resolve(target.featureDir, 'tech-design.md'),
       codeReviewPath: featureArtifactPath(target, selectedFeatureId, 'code-review.md'),
       unitTestReportPath: featureArtifactPath(target, selectedFeatureId, 'unit_test_report.md'),
       workflow: inv.workflow,
@@ -302,6 +313,9 @@ async function runSubagentForTarget(
       // Knowledge bases are service-scoped.  Unlike shared arch-docs, never
       // search parent directories for this path.
       kbContextPath,
+      ...(def.subagent === 'code-review'
+        ? { reviewScope: resolveReviewScope(state.lastPhaseResult?.changedFiles, target.projectRoot) }
+        : {}),
       ...(def.subagent === 'tdd-test-spec'
         ? { testSpecTemplatePath: resolve(deps.ctx.packageRoot, 'templates', 'test_spec_template.md') }
         : {}),
@@ -317,7 +331,20 @@ async function runSubagentForTarget(
     mode: def.isRepair ? 'incremental-fix' : 'normal',
   };
   try {
-    return await runPhaseSubagent(state, req, deps);
+    const beforeChanges = mutatesImplementation(def)
+      ? snapshotGitChanges(target.projectRoot)
+      : undefined;
+    const result = await runPhaseSubagent(state, req, deps);
+    const observedChanges = beforeChanges
+      ? changedSinceSnapshot(beforeChanges, snapshotGitChanges(target.projectRoot))
+      : [];
+    return {
+      ...result,
+      changedFiles: [...new Set([
+        ...normalizeChangedFiles(result.changedFiles, target.projectRoot),
+        ...observedChanges,
+      ])],
+    };
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return {
@@ -328,6 +355,84 @@ async function runSubagentForTarget(
       changedFiles: [],
       blocker: `请解决 ${def.subagent} 的子模型、提供方或运行时错误后再继续运行`,
     };
+  }
+}
+
+function mutatesImplementation(def: PhaseDef): boolean {
+  return def.name === 'PHASE2_IMPLEMENTATION' || def.name === 'PHASE2_REPAIR';
+}
+
+/**
+ * Build the authoritative review target list. Prefer the immediately preceding
+ * implementation/repair result, because a repository can already contain
+ * unrelated user changes. Git working-tree discovery is only a compatibility
+ * fallback for older execution states that did not persist changedFiles.
+ */
+export function resolveReviewScope(previousChangedFiles: string[] | undefined, projectRoot: string): ReviewScope {
+  const previous = normalizeChangedFiles(previousChangedFiles ?? [], projectRoot);
+  if (previous.length > 0) {
+    return { changedFiles: previous, source: 'previous-phase', lineMode: 'added-lines-only' };
+  }
+
+  const workingTree = collectGitChangedFiles(projectRoot);
+  return {
+    changedFiles: workingTree,
+    source: workingTree.length > 0 ? 'git-working-tree' : 'empty',
+    lineMode: 'added-lines-only',
+  };
+}
+
+function normalizeChangedFiles(files: string[], projectRoot: string): string[] {
+  const root = resolve(projectRoot);
+  return [...new Set(files.flatMap((file) => {
+    const trimmed = file.trim();
+    if (!trimmed) return [];
+    const absolute = isAbsolute(trimmed) ? resolve(trimmed) : resolve(root, trimmed);
+    return isInside(absolute, root) ? [absolute] : [];
+  }))];
+}
+
+function collectGitChangedFiles(projectRoot: string): string[] {
+  const commands = [
+    ['diff', '--name-only', '-z', '--diff-filter=ACMRTUXB', '--'],
+    ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMRTUXB', '--'],
+    ['ls-files', '--others', '--exclude-standard', '-z', '--'],
+  ];
+  const files: string[] = [];
+  for (const args of commands) {
+    try {
+      const output = execFileSync('git', args, {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 15_000,
+        windowsHide: true,
+      });
+      files.push(...output.split('\0').filter(Boolean));
+    } catch {
+      return [];
+    }
+  }
+  return normalizeChangedFiles(files, projectRoot);
+}
+
+function snapshotGitChanges(projectRoot: string): Map<string, string> {
+  return new Map(collectGitChangedFiles(projectRoot).map((file) => [file, fileFingerprint(file)]));
+}
+
+function changedSinceSnapshot(before: Map<string, string>, after: Map<string, string>): string[] {
+  return [...after].flatMap(([file, fingerprint]) => (
+    before.get(file) === fingerprint ? [] : [file]
+  ));
+}
+
+function fileFingerprint(file: string): string {
+  try {
+    return createHash('sha256').update(readFileSync(file)).digest('hex');
+  } catch {
+    // Missing or unreadable paths can only represent removals. Review is
+    // added-line-only, so they do not belong in its target list.
+    return 'missing';
   }
 }
 

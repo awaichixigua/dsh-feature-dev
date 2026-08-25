@@ -11,4 +11,4 @@
 | Redis、消息队列、OpenFeign、ES、分布式任务 | `library/java/integration.md` |
 | 用户输入、文件上传、密钥、日志或 SQL | `library/security.md` |
 
-只对本次 diff 中新增或修改的行提出问题；存量代码可以作为理解上下文，但不得据此发出本阶段的 BLOCK 或 WARN。
+`inputs.reviewScope.changedFiles` 是唯一允许审查的文件清单。只能对清单内文件执行带路径限制的 diff，并且只对 diff 的新增或修改行提出问题。不得执行全仓搜索、全模块扫描或不带路径限制的质量脚本。存量代码可以作为理解相邻变更的少量上下文，但不得据此发出本阶段的 BLOCK 或 WARN。
