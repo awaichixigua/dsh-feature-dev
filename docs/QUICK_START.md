@@ -1,6 +1,6 @@
 # Quick Start
 
-本指南以当前 `dsh-feature-dev` 0.1.5 的 Skill、工具和状态机实现为准。它是面向业务 Git 仓库的 DSH 工作流 Bundle，不是业务项目本身。
+本指南以当前 `dsh-feature-dev` 0.1.8 的 Skill、工具和状态机实现为准。它是面向业务 Git 仓库的 DSH 工作流 Bundle，不是业务项目本身。
 
 ## 前置条件
 
@@ -12,29 +12,30 @@
 
 ## 安装插件（默认：GitLab `git+URL`）
 
-默认按 [PUBLISH.md](PUBLISH.md) 的 GitLab 安装方式使用已发布版本。Git 依赖首次安装前，需要为目标 DSH profile 批准 `prepare` 构建脚本；以下以 `web` profile 为例：
+默认按 [PUBLISH.md](PUBLISH.md) 的 GitLab 安装方式使用已发布版本。Git 依赖首次安装前，需要为目标 DSH profile 批准 `prepare` 构建脚本；以下以 Linux 的 `web` profile 为例：
 
-```powershell
+```bash
 dsh plugin --profile web install
-$workspace = Join-Path $env:USERPROFILE '.dsh\profiles\web\pnpm-workspace.yaml'
-notepad $workspace
+vi /root/.dsh/profiles/web/pnpm-workspace.yaml
 ```
 
-在打开的 `pnpm-workspace.yaml` 的 `allowBuilds:` 下加入以下条目，并保留文件既有内容：
+在打开的 `pnpm-workspace.yaml` 的 `allowBuilds:` 下加入以下条目，并保留文件既有内容。Git 托管依赖必须使用 pnpm 输出的完整依赖定位符，整个 YAML 键必须加引号：
 
 ```yaml
 allowBuilds:
-  '@engios/dsh-feature-dev': true
+  '@engios/dsh-feature-dev@git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#19e9c727b2c4d59bf8f43c9702a4413d773a28d9': true
 ```
+
+上面的提交哈希对应 `v0.1.8`。升级到其他版本时，如果 pnpm 报 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`，请将该键替换为错误信息中 `allowBuilds` 下打印的完整键。
 
 然后安装指定版本（推荐，便于回归和回滚）：
 
-```powershell
-dsh plugin --profile web add git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v<version>
+```bash
+dsh plugin --profile web add 'git+http://gitlab.iheatingos.com:8083/engios/dsh-feature-dev.git#v0.1.8'
 dsh --profile web --dump-config
 ```
 
-如需跟随远端默认分支，可省略 `#v<version>`。DSH 会执行 `git clone`、`pnpm install` 和已批准的 `prepare`，编译出 `lib/` 后再加载 Bundle。
+如需跟随远端默认分支，可省略 `#v0.1.8`；但远端提交变化后需要按 pnpm 的新提示同步更新 `allowBuilds` 键，因此生产环境推荐始终锁定版本标签。DSH 会执行 `git clone`、`pnpm install` 和已批准的 `prepare`，编译出 `lib/` 后再加载 Bundle。
 
 本地路径安装仅用于开发验证：
 
