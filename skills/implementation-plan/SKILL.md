@@ -12,13 +12,19 @@ argument-hint: <MRD URL 或需求描述> --feature-dir <需求目录名> [--clar
 
 `--feature-dir` 是启动 `implementation-plan` 的必填参数，且必须是 `{版本号}_{需求编号}_{中文需求标题}` 形式的正式需求目录名。MRD URL 或直接输入的需求会先暂存在 `<projectRoot>/.tmp/<feature-dir 的目录名>`；这里是来源整理和服务路由的临时运行目录，不代表省略 `featureDir`，也不得在启动前手工创建正式 `req/` 目录。既然已提供 `featureDir`，运行目录不再使用 MRD URL hash。服务路由和需求分支门禁通过后，文档和运行状态才沉淀到 `<主服务仓库>/req/<feature-dir 的目录名>`；随后由主会话在该服务仓库内完成需求澄清，并将其 `app-knowledge-base/` 作为交叉验证知识库。
 
+## 启动硬约束
+
+- 用户未传 `--project-root` 时，省略工具参数 `projectRoot`，由 runtime 直接使用当前工作目录。不得为推断项目根目录而执行 Bash、搜索 `req/`、枚举 Git 仓库或检索业务代码，也不得先向用户追问 `projectRoot`。
+- 收到需求来源和 `--feature-dir` 后立即调用 `feature_dev_run`。不得在工具调用前询问或推断主服务、协作服务、只读服务及仓库路径；首次服务识别必须由工作流内的 `app-router` 执行。
+- 只有工具明确返回 `pendingMainAction.kind = route_services` 时，主会话才收集服务范围；只有返回 `post_service_router` 确认门时，才让用户核对 app-router 的结果。
+
 ## 需求分支准备
 
 服务路由完成后，工作流会先返回 `post_service_router` 确认门。向用户展示该确认门和选项，要求其核对 `apps.json` 中的 `primary`、`collaborators`、`readOnly` 和 `repositories` 是否覆盖了正确的服务范围。不得自行跳过或确认。用户选择 `accept` 或 `revise` 后，立即使用相同的 `projectRoot` 和 `featureDir` 调用 `feature_dev_resume` 继续工作流；前者会继续准备服务需求分支，后者会重新执行服务路由。若重新路由再次触发确认门，必须再次展示给用户，不能自动确认。
 
-服务路由完成后、生成 PRD 前，工作流会为每个主改和协同服务准备分支。需求目录名必须为 `{版本号}_{需求编号}_{中文需求标题}`，例如 `2.1.10_98532_Engios平台接入应用`。工作流会执行 `git fetch origin --prune`，然后切换到或从 `origin/release` 创建 `fun_{版本号}_{需求编号}_{标题}_{Git 用户名}`；新建分支会通过 `git push -u origin` 发布。
+服务路由完成后、生成 PRD 前，工作流会为每个主改和协同服务准备分支。需求目录名必须为 `{版本号}_{需求编号}_{中文需求标题}`，例如 `2.1.10_98532_Engios平台接入应用`。工作流会执行 `git fetch origin --prune`；创建新的 `fun_{版本号}_{需求编号}_{标题}_{Git 用户名}` 时，先选择数字版本号最高的 `origin/v*-release`（例如 `v2.2.10-release` 高于 `v2.2.9-release`），不存在任何版本 release 分支时才使用 `origin/master`，然后只推送新建的功能分支。
 
-服务路由必须向 `<featureDir>/apps.json` 写入 `repositories` 映射，覆盖所有可写服务。只读服务不会切换分支。若缺少仓库路径、缺少 `origin/release`、`git config user.name` 无效，或工作区存在脏改动，工作流会在写入 PRD 前阻塞。
+服务路由必须向 `<featureDir>/apps.json` 写入 `repositories` 映射，覆盖所有可写服务。只读服务不会切换分支。若缺少仓库路径、同时缺少 `origin/v*-release` 与 `origin/master`、`git config user.name` 无效，或工作区存在脏改动，工作流会在写入 PRD 前阻塞。主会话不得创建、推送或要求用户创建名为 `release` 的本地/远程别名分支；门禁失败时只报告原始阻塞原因。
 
 PRD 与技术方案生成后，工作流会将 `prd.md` 和 `tech-design.md` 同步到每个协作服务的 `req/<需求目录名>/`；主服务目录仍保存权威运行状态。
 
@@ -44,13 +50,14 @@ PRD 与技术方案生成后，工作流会将 `prd.md` 和 `tech-design.md` 同
 ```json
 {
   "workflow": "implementation-plan",
-  "projectRoot": "<业务项目根目录>",
   "featureDir": "<需求目录>",
   "mrdUrl": "<MRD URL；与 rawUserRequest 二选一>",
   "rawUserRequest": "<直接输入的需求；与 mrdUrl 二选一>",
   "options": { "clarifyMode": "dialogue 或 batch", "autoCommit": true }
 }
 ```
+
+仅当用户显式提供 `--project-root` 时，才把该绝对路径作为 `projectRoot` 传入；否则不要构造或补全此字段。
 
 `--auto-comit` 在工作流成功完成后自动执行 `git add --all`、`git commit` 和 `git push`，因此包括新增文件和删除。`--auto-commit` 可作为兼容拼写。
 

@@ -137,7 +137,7 @@ pnpm build
 - `pendingMainAction` 表示主会话必须完成的澄清或服务路由文件操作；完成前不能直接继续。
 - `phaseHistory` 与 `lastPhaseResult` 可定位最后一个子代理结果和产物校验失败原因。
 - `status=blocked` 的恢复会回退最近失败阶段；终态 `completed`、`aborted`、`failed` 不能恢复。
-- 对 Git 问题，先检查 `apps.json` 的服务仓库路径、`origin/release`、Git 用户名及工作区状态。
+- 对 Git 问题，先检查 `apps.json` 的服务仓库路径、可用的 `origin/v*-release`（没有时检查 `origin/master`）、Git 用户名及工作区状态；不要创建 `release` 别名分支。
 
 ## 配置和兼容性
 

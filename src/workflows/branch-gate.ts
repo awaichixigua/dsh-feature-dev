@@ -3,7 +3,9 @@
  *
  * The router declares the writable service repositories in apps.json. Before
  * a PRD can be written, every such repository is placed on the requirement
- * branch, creating and publishing it from origin/release when necessary.
+ * branch. A missing requirement branch is created from the newest
+ * origin/v*-release branch, falling back to origin/master when no versioned
+ * release branch exists.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -42,6 +44,7 @@ interface AppsFile {
 }
 
 const INVALID_USERS = new Set(['administrator', 'root', 'system']);
+const VERSIONED_RELEASE_REF = /^origin\/v(\d+(?:\.\d+)*)-release$/;
 
 const systemGit: GitClient = {
   run(cwd, args) {
@@ -89,6 +92,26 @@ export function requirementBranchName(featureDir: string, userName: string): str
 }
 
 /**
+ * Pick the remote baseline used to create a requirement branch. Version
+ * components are compared numerically so v2.2.10 sorts after v2.2.9.
+ * origin/release is deliberately not accepted as an alias.
+ */
+export function selectRequirementBaseBranch(remoteRefs: string[]): string {
+  const candidates = remoteRefs
+    .map((ref) => ref.trim())
+    .filter(Boolean)
+    .map((ref) => {
+      const match = VERSIONED_RELEASE_REF.exec(ref);
+      return match ? { ref, version: match[1]!.split('.').map(Number) } : undefined;
+    })
+    .filter((item): item is { ref: string; version: number[] } => item !== undefined)
+    .sort((left, right) => compareVersions(right.version, left.version));
+  if (candidates[0]) return candidates[0].ref;
+  if (remoteRefs.some((ref) => ref.trim() === 'origin/master')) return 'origin/master';
+  throw new Error('远程仓库既没有 origin/v*-release 版本分支，也没有 origin/master，无法准备需求分支');
+}
+
+/**
  * Prepare all primary/collaborating repositories. Read-only services never
  * switch branches. This operation is deliberately synchronous: a later phase
  * must not observe only part of the service set prepared.
@@ -111,24 +134,30 @@ export function prepareRequirementBranches(
       const branch = requirementBranchName(featureDir, userName);
 
       git.run(repo, ['fetch', 'origin', '--prune']);
-      if (!git.succeeds(repo, ['show-ref', '--verify', '--quiet', 'refs/remotes/origin/release'])) {
-        throw new Error(`服务 ${service} 缺少 origin/release，无法准备需求分支`);
-      }
+      const remoteRefs = listRemoteBranches(repo, git);
       const hasLocal = git.succeeds(repo, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]);
-      const hasRemote = git.succeeds(repo, ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`]);
+      const remoteBranch = `origin/${branch}`;
+      const hasRemote = remoteRefs.includes(remoteBranch);
 
       const changes = git.run(repo, ['status', '--porcelain']);
       if (hasUnsafeWorktreeChanges(changes, repo, featureDir)) {
         throw new Error(`服务 ${service} 工作区存在未提交修改，不能切换到需求分支`);
       }
       if (hasRemote) {
+        fetchRemoteBranch(repo, remoteBranch, git);
         if (hasLocal) git.run(repo, ['switch', branch]);
-        else git.run(repo, ['switch', '--track', '-c', branch, `origin/${branch}`]);
+        else git.run(repo, ['switch', '-c', branch, remoteBranch]);
         git.run(repo, ['merge', '--ff-only', `origin/${branch}`]);
+        configureBranchUpstream(repo, branch, git);
         evidence.push(`branch_ready:${service}:${branch}:remote_existing`);
       } else {
         if (hasLocal) git.run(repo, ['switch', branch]);
-        else git.run(repo, ['switch', '-c', branch, '--track', 'origin/release']);
+        else {
+          const baseBranch = selectRequirementBaseBranch(remoteRefs);
+          fetchRemoteBranch(repo, baseBranch, git);
+          git.run(repo, ['switch', '-c', branch, baseBranch]);
+          evidence.push(`branch_base:${service}:${baseBranch}`);
+        }
         git.run(repo, ['push', '-u', 'origin', branch]);
         evidence.push(`branch_ready:${service}:${branch}:remote_created`);
       }
@@ -142,6 +171,31 @@ export function prepareRequirementBranches(
     const detail = error instanceof Error ? error.message : String(error);
     return { ok: false, summary: '需求分支门禁未通过', evidence: [], blocker: detail };
   }
+}
+
+/** Query the authoritative remote instead of trusting a possibly restricted fetch refspec. */
+function listRemoteBranches(repo: string, git: GitClient): string[] {
+  return git.run(repo, ['ls-remote', '--heads', 'origin'])
+    .split(/\r?\n/)
+    .map((line) => /^[0-9a-f]+\s+refs\/heads\/(.+)$/i.exec(line.trim())?.[1])
+    .filter((name): name is string => Boolean(name))
+    .map((name) => `origin/${name}`);
+}
+
+/** Fetch only the selected branch into its canonical origin/* tracking ref. */
+function fetchRemoteBranch(repo: string, remoteBranch: string, git: GitClient): void {
+  const name = remoteBranch.replace(/^origin\//, '');
+  git.run(repo, [
+    'fetch',
+    'origin',
+    `+refs/heads/${name}:refs/remotes/origin/${name}`,
+  ]);
+}
+
+/** Configure the existing remote feature branch without relying on fetch refspec discovery. */
+function configureBranchUpstream(repo: string, branch: string, git: GitClient): void {
+  git.run(repo, ['config', `branch.${branch}.remote`, 'origin']);
+  git.run(repo, ['config', `branch.${branch}.merge`, `refs/heads/${branch}`]);
 }
 
 /**
@@ -248,6 +302,15 @@ function normalizeBranchPart(value: string): string {
     .replace(/\.{2,}/g, '.')
     .replace(/-+/g, '-')
     .replace(/^[.-]+|[.-]+$/g, '');
+}
+
+function compareVersions(left: number[], right: number[]): number {
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
 function isInside(child: string, parent: string): boolean {

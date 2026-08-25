@@ -4,6 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import { normalizeInvocation, parseSkillArgv, KNOWN_WORKFLOWS } from '../../src/runtime/invocation.ts';
 
 void test('KNOWN_WORKFLOWS contains all required workflows', () => {
@@ -128,6 +129,20 @@ void test('normalizeInvocation: resolves projectRoot and validates featureDir', 
   assert.equal(inv.workflow, 'code-gen-tdd');
   assert.equal(inv.projectRoot, process.cwd());
   assert.equal(inv.featureDir, process.cwd());
+});
+
+void test('normalizeInvocation: defaults projectRoot to the current working directory', () => {
+  const cwd = process.cwd();
+  const inv = normalizeInvocation(
+    {
+      workflow: 'mrd-to-code',
+      featureDir: '3.0.0_111111_热源描述',
+      rawUserRequest: '增加热源描述字段',
+    },
+    { importMetaUrl: import.meta.url, cwd, defaultWorkflow: 'mrd-to-code' }
+  );
+  assert.equal(inv.projectRoot, cwd);
+  assert.equal(inv.featureDir, resolve(cwd, '3.0.0_111111_热源描述'));
 });
 
 void test('parseSkillArgv: detects workflow from first positional', () => {

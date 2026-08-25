@@ -37,7 +37,7 @@ import { resolvePackageRoot } from '../runtime/paths.js';
 
 const PROJECT_ROOT = {
   type: 'string' as const,
-  description: '业务项目根目录的绝对路径（包含 `req/` 的 Git 仓库）。',
+  description: '可选的业务聚合项目根目录绝对路径；省略时必须直接使用工具执行上下文的当前工作目录，不得为推断该参数预先搜索 `req/`、Git 仓库或业务代码。多服务聚合目录本身可以不是 Git 仓库。',
 } as const;
 
 const FEATURE_DIR = {
@@ -109,7 +109,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition[] {
   return [
     defineTool({
       name: 'feature_dev_run',
-      description: '启动 feature_dev 工作流，并在 `<featureDir>/ai/` 下持久化状态。implementation-plan、code-gen-tdd 和 bugfix 可设置 options.autoCommit=true（命令参数 --auto-comit）；成功后会自动提交并推送所有变更，包括新增文件。',
+      description: '启动 feature_dev 工作流；projectRoot 省略时直接使用当前工作目录，不做目录搜索或服务预判。运行在 `<featureDir>/ai/` 下持久化状态。implementation-plan、code-gen-tdd 和 bugfix 可设置 options.autoCommit=true（命令参数 --auto-comit）；成功后会自动提交并推送所有变更，包括新增文件。',
       parameters: {
         workflow: WORKFLOW,
         projectRoot: PROJECT_ROOT,

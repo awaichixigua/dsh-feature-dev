@@ -52,6 +52,17 @@ void test('no skill body contains a Claude placeholder', () => {
   }
 });
 
+void test('planning skills delegate missing projectRoot to runtime without repository preflight', () => {
+  const skills = discoverSkills(PKG_ROOT);
+  for (const name of ['implementation-plan', 'mrd-to-code']) {
+    const skill = skills.find((item) => item.name === name);
+    assert.ok(skill, `missing ${name}`);
+    assert.match(skill.body, /当前工作目录/);
+    assert.match(skill.body, /不得为推断项目根目录/);
+    assert.match(skill.body, /app-router/);
+  }
+});
+
 void test('each skill has a resourceBase inside the package', () => {
   const skills = discoverSkills(PKG_ROOT);
   for (const s of skills) {

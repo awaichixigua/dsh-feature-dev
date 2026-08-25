@@ -45,18 +45,26 @@ function makeProject(): { project: string; featureDir: string } {
   }, null, 2), 'utf8');
 
   // BRANCH_GATE deliberately performs real Git operations. Give the fixture
-  // a minimal release branch and local bare origin so the E2E test exercises
-  // the production path without depending on a network remote.
+  // a minimal versioned release branch and local bare origin so the E2E test
+  // exercises the production path without depending on a network remote.
   writeFileSync(join(project, '.gitignore'), '.tmp/\n.remote.git/\n', 'utf8');
   execFileSync('git', ['init'], { cwd: project, stdio: 'ignore' });
   execFileSync('git', ['config', 'user.name', 'fixture'], { cwd: project });
   execFileSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: project });
-  execFileSync('git', ['switch', '-c', 'release'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['switch', '-c', 'v2.2.10-release'], { cwd: project, stdio: 'ignore' });
   execFileSync('git', ['add', '.gitignore', 'req'], { cwd: project });
   execFileSync('git', ['commit', '-m', 'fixture baseline'], { cwd: project, stdio: 'ignore' });
   execFileSync('git', ['init', '--bare', '.remote.git'], { cwd: project, stdio: 'ignore' });
   execFileSync('git', ['remote', 'add', 'origin', join(project, '.remote.git')], { cwd: project });
-  execFileSync('git', ['push', '-u', 'origin', 'release'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['push', '-u', 'origin', 'v2.2.10-release'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['branch', 'v2.2.9-release'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['push', 'origin', 'v2.2.9-release'], { cwd: project, stdio: 'ignore' });
+  // Simulate a single-branch/restricted clone: a normal fetch sees only the
+  // older release. BRANCH_GATE must query remote heads and explicitly fetch
+  // v2.2.10-release before creating the requirement branch.
+  execFileSync('git', ['config', '--unset-all', 'remote.origin.fetch'], { cwd: project, stdio: 'ignore' });
+  execFileSync('git', ['config', '--add', 'remote.origin.fetch', '+refs/heads/v2.2.9-release:refs/remotes/origin/v2.2.9-release'], { cwd: project });
+  execFileSync('git', ['update-ref', '-d', 'refs/remotes/origin/v2.2.10-release'], { cwd: project });
   return { project, featureDir };
 }
 

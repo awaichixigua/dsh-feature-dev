@@ -110,6 +110,15 @@ void test('buildTools produces 4 tools with parameters and output.render', () =>
   }
 });
 
+void test('feature_dev_run keeps projectRoot optional and documents the cwd default', () => {
+  const run = buildTools().find((tool) => tool.name === 'feature_dev_run');
+  assert.ok(run, 'missing feature_dev_run');
+  const projectRoot = run.parameters.properties.projectRoot as { required?: boolean; description?: string };
+  assert.notEqual(projectRoot.required, true);
+  assert.match(projectRoot.description ?? '', /当前工作目录/);
+  assert.match(run.description, /projectRoot 省略时直接使用当前工作目录/);
+});
+
 void test('resume/status/confirm expose optional runId routing', () => {
   const tools = buildTools();
   for (const name of ['feature_dev_resume', 'feature_dev_status', 'feature_dev_confirm']) {

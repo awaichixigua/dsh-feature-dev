@@ -5,10 +5,10 @@
 ## 前置条件
 
 - Node.js 22 或更高版本，以及可用的 DeepSeek Harness（DSH）。
-- 在目标业务项目的 Git 仓库根目录启动 DSH 会话；默认 `projectRoot` 使用该会话的工作目录。
+- 默认 `projectRoot` 直接使用 DSH 会话的当前工作目录；未传 `--project-root` 时不会预先搜索 `req/`、Git 仓库或业务代码。多服务场景可在包含各服务仓库的聚合目录启动 DSH，该目录本身不要求是 Git 仓库。
 - 如果显式传 `--project-root`，必须传绝对路径。
 - `/implementation-plan` 和 `/mrd-to-code` 必须提供正式需求目录名：`req/{版本号}_{需求编号}_{中文需求标题}`，例如 `req/2.0.0_103111_fastjson替换为jackson`。不要预先手工创建该正式目录。
-- 需求规划会为可写服务准备需求分支。每个目标仓库需要有有效的 `git config user.name`、`origin/release` 和干净工作区；新分支会从 `origin/release` 创建并推送到 `origin`。
+- 需求规划会为可写服务准备需求分支。每个目标仓库需要有有效的 `git config user.name` 和干净工作区；新分支优先从数字版本最高的 `origin/v*-release` 创建，没有版本 release 分支时从 `origin/master` 创建，并只把功能分支推送到 `origin`。
 
 ## 安装插件（默认：GitLab `git+URL`）
 
