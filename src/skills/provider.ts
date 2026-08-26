@@ -67,7 +67,9 @@ export function discoverSkills(packageRoot: string): SkillDescriptor[] {
 }
 
 function parseSkillFile(raw: string, fallbackName: string, resourceBase: string): SkillDescriptor {
-  const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  // Git commonly checks text files out with CRLF on Windows. Accept either
+  // newline convention so bundled skills load consistently across platforms.
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!m) {
     throw new ValidationError('SKILL.md missing YAML frontmatter', { resourceBase });
   }

@@ -13,7 +13,9 @@ import assert from 'node:assert/strict';
 import { discoverSkills } from '../../src/skills/provider.ts';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(here, '..', '..');
@@ -38,6 +40,21 @@ void test('each skill has a description and is user-invocable', () => {
   for (const s of skills) {
     assert.ok(s.description.length > 10, `${s.name}: description too short`);
     assert.equal(s.userInvocable, true, `${s.name}: not user-invocable`);
+  }
+});
+
+void test('skill frontmatter accepts CRLF line endings', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-skill-crlf-'));
+  try {
+    const skillPath = join(root, 'skills', 'windows-skill', 'SKILL.md');
+    mkdirSync(dirname(skillPath), { recursive: true });
+    writeFileSync(skillPath, '---\r\nname: windows-skill\r\ndescription: Supports Windows checkouts.\r\n---\r\n\r\n# Windows skill\r\n');
+    const [skill] = discoverSkills(root);
+    assert.equal(skill?.name, 'windows-skill');
+    assert.equal(skill?.description, 'Supports Windows checkouts.');
+    assert.equal(skill?.body, '# Windows skill');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
